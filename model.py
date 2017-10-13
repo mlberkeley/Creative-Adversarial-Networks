@@ -180,12 +180,12 @@ class DCGAN(object):
   
     counter = 1
     start_time = time.time()
-    could_load, checkpoint_counter = self.load(self.checkpoint_dir)
-    if could_load:
-      counter = checkpoint_counter
-      print(" [*] Load SUCCESS")
-    else:
-      print(" [!] Load failed...")
+    #could_load, checkpoint_counter = self.load(self.checkpoint_dir)
+    #if could_load:
+    #  counter = checkpoint_counter
+    #  print(" [*] Load SUCCESS")
+    #else:
+    #  print(" [!] Load failed...")
 
     for epoch in xrange(config.epoch):
       if config.dataset == 'mnist':
@@ -355,22 +355,28 @@ class DCGAN(object):
         self.h0 = tf.reshape(
             self.z_, [-1, s_h16, s_w16, self.gf_dim * 8])
         h0 = tf.nn.relu(self.g_bn0(self.h0))
-        self.h1, self.hw_w, self.hw_b = resizeconv(
+        h1, self.hw_w, self.hw_b = resizeconv(
              h0, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h1', with_w=True)
         #self.h1, self.h1_w, self.h1_b = deconv2d(
         #    h0, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h1', with_w=True)
         h1 = tf.nn.relu(self.g_bn1(self.h1))
 
-        h2, self.h2_w, self.h2_b = deconv2d(
-            h1, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h2', with_w=True)
+        h2, self.h2_w, self.h2_b = resizeconv(
+             h1, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h3', with_w=True)
+        #h2, self.h2_w, self.h2_b = deconv2d(
+        #    h1, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h2', with_w=True)
         h2 = tf.nn.relu(self.g_bn2(h2))
 
-        h3, self.h3_w, self.h3_b = deconv2d(
+        h3, self.h3_w, self.h3_b = resizeconv(
             h2, [self.batch_size, s_h2, s_w2, self.gf_dim*1], name='g_h3', with_w=True)
+        #h3, self.h3_w, self.h3_b = deconv2d(
+        #    h2, [self.batch_size, s_h2, s_w2, self.gf_dim*1], name='g_h3', with_w=True)
         h3 = tf.nn.relu(self.g_bn3(h3))
 
-        h4, self.h4_w, self.h4_b = deconv2d(
+        h4, self.h4_w, self.h4_b = resizeconv(
             h3, [self.batch_size, s_h, s_w, self.c_dim], name='g_h4', with_w=True)
+        #h4, self.h4_w, self.h4_b = deconv2d(
+        #    h3, [self.batch_size, s_h, s_w, self.c_dim], name='g_h4', with_w=True)
 
         return tf.nn.tanh(h4)
       else:
@@ -392,13 +398,13 @@ class DCGAN(object):
 
         h1 = conv_cond_concat(h1, yb)
 
-        h2 = tf.nn.relu(self.g_bn2(deconv2d(h1,
+        h2 = tf.nn.relu(self.g_bn2(resizeconv(h1,
             [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2')))
         h2 = conv_cond_concat(h2, yb)
-
+        #above was identical except resizeconv <--> deconv2d
         return tf.nn.sigmoid(
-            deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
-
+            resizeconv(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
+        #above was identical except resizeconv <--> deconv2d
   def sampler(self, z, y=None):
     with tf.variable_scope("generator") as scope:
       scope.reuse_variables()
@@ -416,16 +422,16 @@ class DCGAN(object):
             [-1, s_h16, s_w16, self.gf_dim * 8])
         h0 = tf.nn.relu(self.g_bn0(h0, train=False))
 
-        h1 = deconv2d(h0, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h1')
+        h1 = resizeconv(h0, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h1')
         h1 = tf.nn.relu(self.g_bn1(h1, train=False))
 
-        h2 = deconv2d(h1, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h2')
+        h2 = resizeconv(h1, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h2')
         h2 = tf.nn.relu(self.g_bn2(h2, train=False))
 
-        h3 = deconv2d(h2, [self.batch_size, s_h2, s_w2, self.gf_dim*1], name='g_h3')
+        h3 = resizeconv(h2, [self.batch_size, s_h2, s_w2, self.gf_dim*1], name='g_h3')
         h3 = tf.nn.relu(self.g_bn3(h3, train=False))
 
-        h4 = deconv2d(h3, [self.batch_size, s_h, s_w, self.c_dim], name='g_h4')
+        h4 = resizeconv(h3, [self.batch_size, s_h, s_w, self.c_dim], name='g_h4')
 
         return tf.nn.tanh(h4)
       else:
@@ -446,10 +452,10 @@ class DCGAN(object):
         h1 = conv_cond_concat(h1, yb)
 
         h2 = tf.nn.relu(self.g_bn2(
-            deconv2d(h1, [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2'), train=False))
+            resizeconv(h1, [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2'), train=False))
         h2 = conv_cond_concat(h2, yb)
 
-        return tf.nn.sigmoid(deconv2d(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
+        return tf.nn.sigmoid(resizeconv(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
 
   def load_mnist(self):
     data_dir = os.path.join("./data", self.dataset_name)

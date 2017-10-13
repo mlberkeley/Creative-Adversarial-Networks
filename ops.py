@@ -64,22 +64,22 @@ def conv2d(input_, output_dim,
 
 def resizeconv(input_, output_dim,
 		k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
-		name="conv2d", with_w=False):
+		name="resconv", with_w=False):
   with tf.variable_scope(name):
     
-    resized = tf.image.resize_images(input_,(output_dim[1]*d_h + k_h, output_dim[2]*d_h + k_h),
-		ResizeMethod.NEAREST_NEIGHBOR)
-    w = tf.get_variable('w', [k_h, k_w, resize.get_shape()[-1], output_dim[-1]],
+    resized = tf.image.resize_nearest_neighbor(input_,((output_dim[1]-1)*d_h + k_h-4, (output_dim[2]-1)*d_w + k_w-4))
+    #The 4 is because of same padding in tf.nn.conv2d.
+    w = tf.get_variable('w', [k_h, k_w, resized.get_shape()[-1], output_dim[-1]],
 		initializer=tf.truncated_normal_initializer(stddev=stddev))
-    conv = tf.nn.conv2d(resize, w, strides=[1, d_h, d_w, 1], padding='SAME')
-    biases = tf.get_variable('biases', [output_dim], initializer=tf.constant_initializer(0.0))
+    resconv = tf.nn.conv2d(resized, w, strides=[1, d_h, d_w, 1], padding='SAME')
+    biases = tf.get_variable('biases', output_dim[-1], initializer=tf.constant_initializer(0.0))
+
     	
-    conv = tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape())
-    
+    resconv = tf.reshape(tf.nn.bias_add(resconv, biases), resconv.get_shape())
     if with_w:
-      return deconv, w, biases
+      return resconv, w, biases
     else:
-      return deconv
+      return resconv
 
 def deconv2d(input_, output_shape,
        k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
