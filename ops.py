@@ -74,8 +74,8 @@ def resizeconv(input_, output_dim,
     resconv = tf.nn.conv2d(resized, w, strides=[1, d_h, d_w, 1], padding='SAME')
     biases = tf.get_variable('biases', output_dim[-1], initializer=tf.constant_initializer(0.0))
 
-    	
     resconv = tf.reshape(tf.nn.bias_add(resconv, biases), output_dim)
+    print('resconv_shape:{0}, output_dim:{1}'.format(resconv.get_shape(), output_dim))
     if with_w:
       return resconv, w, biases
     else:
