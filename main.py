@@ -59,6 +59,21 @@ def main(_):
           crop=FLAGS.crop,
           checkpoint_dir=FLAGS.checkpoint_dir,
           sample_dir=FLAGS.sample_dir)
+    elif FLAGS.dataset == 'wikiart':
+      dcgan = DCGAN(
+          sess,
+          input_width=FLAGS.input_width,
+          input_height=FLAGS.input_height,
+          output_width=FLAGS.output_width,
+          output_height=FLAGS.output_height,
+          batch_size=FLAGS.batch_size,
+          sample_num=FLAGS.batch_size,
+          y_dim=27,
+          dataset_name=FLAGS.dataset,
+          input_fname_pattern=FLAGS.input_fname_pattern,
+          crop=FLAGS.crop,
+          checkpoint_dir=FLAGS.checkpoint_dir,
+          sample_dir=FLAGS.sample_dir)
     else:
       dcgan = DCGAN(
           sess,

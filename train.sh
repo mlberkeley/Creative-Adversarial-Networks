@@ -6,8 +6,8 @@ python3 main.py \
 --batch_size 64 \
 --input_height 108 \
 --output_height 108 \
---dataset wikiart/Impressionism \
---input_fname_pattern *.jpg \
+--dataset wikiart \
+--input_fname_pattern */*.jpg \
 --checkpint_dir checkpoint \
 --sample_dir samples \
 --crop False \
