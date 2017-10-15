@@ -69,10 +69,18 @@ class DCGAN(object):
     self.dataset_name = dataset_name
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
-
+    
+    print(self.dataset_name)
     if self.dataset_name == 'mnist':
       self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
+    elif self.dataset_name == 'wikiart':
+      print("hi hello")
+      self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
+      self.c_dim = 3
+      self.label_dict = {}
+      print(glob('./data/wikiart/**/', recursive=True))
+      self.data_y = None 
     else:
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
       imreadImg = imread(self.data[0]);
@@ -162,6 +170,21 @@ class DCGAN(object):
     
     if config.dataset == 'mnist':
       sample_inputs = self.data_X[0:self.sample_num]
+      sample_labels = self.data_y[0:self.sample_num]
+    elif config.dataset == 'wikiart':
+      sample_files = self.data[0:self.sample_num]
+      sample = [
+          get_image(sample_file,
+                    input_height=self.input_height,
+                    input_width=self.input_width,
+                    resize_height=self.output_height,
+                    resize_width=self.output_width,
+                    crop=self.crop,
+                    grayscale=self.grayscale) for sample_file in sample_files]
+      if (self.grayscale):
+        sample_inputs = np.array(sample).astype(np.float32)[:, :, :, None]
+      else:
+        sample_inputs = np.array(sample).astype(np.float32)
       sample_labels = self.data_y[0:self.sample_num]
     else:
       sample_files = self.data[0:self.sample_num]
