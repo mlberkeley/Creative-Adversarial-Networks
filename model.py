@@ -79,8 +79,12 @@ class DCGAN(object):
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
       self.c_dim = 3
       self.label_dict = {}
-      print(glob('./data/wikiart/**/', recursive=True))
-      self.data_y = None 
+      path_list = glob('./data/wikiart/**/', recursive=True)[1:]
+      for i, elem in enumerate(path_list):
+        self.label_dict[elem[15:-1]] = i
+      self.data_y = self.get_y(self.data)
+#DOTHIS
+
     else:
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
       imreadImg = imread(self.data[0]);
@@ -185,7 +189,7 @@ class DCGAN(object):
         sample_inputs = np.array(sample).astype(np.float32)[:, :, :, None]
       else:
         sample_inputs = np.array(sample).astype(np.float32)
-      sample_labels = self.data_y[0:self.sample_num]
+      sample_labels = self.get_y(sample_inputs)
     else:
       sample_files = self.data[0:self.sample_num]
       sample = [
@@ -479,6 +483,12 @@ class DCGAN(object):
         h2 = conv_cond_concat(h2, yb)
 
         return tf.nn.sigmoid(resizeconv(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
+  def get_y(self, sample_inputs):
+    ret = []
+    for sample in sample_inputs:
+      lab_str = sample[15:sample[15:].find('/')]
+      ret.append(self.label_dict[lab_str])
+    return ret 
 
   def load_mnist(self):
     data_dir = os.path.join("./data", self.dataset_name)
