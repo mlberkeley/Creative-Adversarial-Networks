@@ -80,6 +80,7 @@ class DCGAN(object):
       self.label_dict = {}
       path_list = glob('./data/wikiart/**/', recursive=True)[1:]
       for i, elem in enumerate(path_list):
+        print(elem[15:-1])
         self.label_dict[elem[15:-1]] = i
       self.data_y = self.get_y(self.data)
 #DOTHIS
@@ -486,7 +487,7 @@ class DCGAN(object):
   def get_y(self, sample_inputs):
     ret = []
     for sample in sample_inputs:
-      lab_str = sample[15:sample[15:].find('/')]
+      lab_str = sample[15:15+sample[15:].find('/')]
       ret.append(self.label_dict[lab_str])
     return ret 
 
