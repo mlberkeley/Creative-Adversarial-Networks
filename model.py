@@ -70,12 +70,11 @@ class DCGAN(object):
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
     
-    print(self.dataset_name)
     if self.dataset_name == 'mnist':
       self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
     elif self.dataset_name == 'wikiart':
-      print("hi hello")
+      print (self.y_dim)
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
       self.c_dim = 3
       self.label_dict = {}
@@ -240,11 +239,12 @@ class DCGAN(object):
             batch_images = np.array(batch).astype(np.float32)[:, :, :, None]
           else:
             batch_images = np.array(batch).astype(np.float32)
+          batch_labels = self.get_y(sample_inputs)
 
         batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
 
-        if config.dataset == 'mnist':
+        if config.dataset == 'mnist' or config.dataset == 'wikiart':
           # Update D network
           _, summary_str = self.sess.run([d_optim, self.d_sum],
             feed_dict={ 
@@ -305,7 +305,7 @@ class DCGAN(object):
             time.time() - start_time, errD_fake+errD_real, errG))
 
         if np.mod(counter, 100) == 1:
-          if config.dataset == 'mnist':
+          if config.dataset == 'mnist' or config.dataset == 'wikiart':
             samples, d_loss, g_loss = self.sess.run(
               [self.sampler, self.d_loss, self.g_loss],
               feed_dict={
