@@ -189,7 +189,7 @@ class DCGAN(object):
         sample_inputs = np.array(sample).astype(np.float32)[:, :, :, None]
       else:
         sample_inputs = np.array(sample).astype(np.float32)
-      sample_labels = self.get_y(sample_files)
+      sample_labels = np.eye(self.y_dim)[np.array(self.get_y(sample_files))]
     else:
       sample_files = self.data[0:self.sample_num]
       sample = [
@@ -240,7 +240,7 @@ class DCGAN(object):
             batch_images = np.array(batch).astype(np.float32)[:, :, :, None]
           else:
             batch_images = np.array(batch).astype(np.float32)
-          batch_labels = self.get_y(batch_files)
+          batch_labels = np.eye(self.y_dim)[np.array(self.get_y(batch_files))]
 
         batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
