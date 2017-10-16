@@ -16,4 +16,3 @@ python3 main.py \
 --visualize False \
 --train
 
--

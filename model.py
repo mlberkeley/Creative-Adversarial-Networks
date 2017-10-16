@@ -168,7 +168,7 @@ class DCGAN(object):
       self.G_sum, self.d_loss_fake_sum, self.g_loss_sum])
     self.d_sum = merge_summary(
         [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
-    path = "./logs/lr=" + str(self.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)
+    path = "./logs/lr=" + str(config.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)
     if not glob(path):
         self.writer = SummaryWriter(path+"/000", self.sess.graph)
     else:
