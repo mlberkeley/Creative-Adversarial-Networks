@@ -170,13 +170,14 @@ class DCGAN(object):
         [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
     path = "./logs/lr=" + str(config.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)+"/"
     if not glob(path + "*"):
-        print(path)
-        path = path + "000"
-        self.writer = SummaryWriter(path, self.sess.graph)
+      path = path + "000"
+      print(path)
+      self.writer = SummaryWriter(path, self.sess.graph)
     else:
-        print(glob(path + "*")[-1])
-        num = str(int(glob(path + "*")[-1][-3:])+1)
-        self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
+      print(glob(path + "*")[-1])
+      num = str(int(glob(path + "*")[-1][-3:])+1)
+      print(path+(3-len(num))*"0"+num)
+      self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
     sample_z = np.random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
     
     if config.dataset == 'mnist':

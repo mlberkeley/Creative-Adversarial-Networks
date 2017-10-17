@@ -8,8 +8,6 @@ python3 main.py \
 --output_height 128 \
 --dataset wikiart \
 --input_fname_pattern */*/.jpg \
---dataset wikiart \
---input_fname_pattern */*.jpg \
 --checkpoint_dir checkpoint \
 --sample_dir samples \
 --crop False \
