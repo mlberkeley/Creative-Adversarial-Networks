@@ -172,7 +172,8 @@ class DCGAN(object):
       print(path)
       self.writer = SummaryWriter(path, self.sess.graph)
     else:
-      num = str(int(glob(path + "*")[-1][-3:])+1)
+      nums = [int(x[-3:]) for x in glob(path+"*")]
+      num = str(max(nums) + 1)
       print(path+(3-len(num))*"0"+num)
       self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
     
