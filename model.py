@@ -76,8 +76,6 @@ class DCGAN(object):
     elif self.dataset_name == 'wikiart':
       print (self.y_dim)
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
-      test_images(self.data)
-      print("tested images")
       self.c_dim = 3
       self.label_dict = {}
       path_list = glob('./data/wikiart/**/', recursive=True)[1:]

@@ -40,10 +40,7 @@ def imread(path, grayscale = False):
       return scipy.misc.imread(path).astype(np.float)
   except(TypeError):
     print(path)
-    out_im = np.array(scipy.misc.imread(path))
-    print (out_im)
-    return out_im.astype(np.float)
-
+#Do
 def test_images(path_glob):
     for path in path_glob:
         imread(path)
