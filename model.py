@@ -69,12 +69,12 @@ class DCGAN(object):
     self.dataset_name = dataset_name
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
-    
+    #print(self.dataset_name)
+    #print(self.input_fname_pattern) 
     if self.dataset_name == 'mnist':
       self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
     elif self.dataset_name == 'wikiart':
-      print (self.y_dim)
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
       self.c_dim = 3
       self.label_dict = {}
@@ -83,8 +83,6 @@ class DCGAN(object):
         print(elem[15:-1])
         self.label_dict[elem[15:-1]] = i
       self.data_y = self.get_y(self.data)
-#DOTHIS
-
     else:
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
       imreadImg = imread(self.data[0]);
@@ -174,10 +172,10 @@ class DCGAN(object):
       print(path)
       self.writer = SummaryWriter(path, self.sess.graph)
     else:
-      print(glob(path + "*")[-1])
       num = str(int(glob(path + "*")[-1][-3:])+1)
       print(path+(3-len(num))*"0"+num)
       self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
+    
     sample_z = np.random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
     
     if config.dataset == 'mnist':
@@ -492,6 +490,7 @@ class DCGAN(object):
         h2 = conv_cond_concat(h2, yb)
 
         return tf.nn.sigmoid(resizeconv(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
+  
   def get_y(self, sample_inputs):
     ret = []
     for sample in sample_inputs:

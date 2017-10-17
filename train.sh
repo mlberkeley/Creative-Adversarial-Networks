@@ -7,7 +7,7 @@ python3 main.py \
 --input_height 128 \
 --output_height 128 \
 --dataset wikiart \
---input_fname_pattern */*/.jpg \
+--input_fname_pattern */*.jpg \
 --checkpoint_dir checkpoint \
 --sample_dir samples \
 --crop False \
