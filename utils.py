@@ -33,10 +33,20 @@ def save_images(images, size, image_path):
   return imsave(inverse_transform(images), size, image_path)
 
 def imread(path, grayscale = False):
-  if (grayscale):
-    return scipy.misc.imread(path, flatten = True).astype(np.float)
-  else:
-    return scipy.misc.imread(path).astype(np.float)
+  try:
+    if (grayscale):
+      return scipy.misc.imread(path, flatten = True).astype(np.float)
+    else:
+      return scipy.misc.imread(path).astype(np.float)
+  except(TypeError):
+    print(path)
+    out_im = np.array(scipy.misc.imread(path))
+    print (out_im)
+    return out_im.astype(np.float)
+
+def test_images(path_glob):
+    for path in path_glob:
+        imread(path)
 
 def merge_images(images, size):
   return inverse_transform(images)
