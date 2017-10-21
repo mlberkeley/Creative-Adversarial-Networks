@@ -17,7 +17,7 @@ class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=64,
-         gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',
+         gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False,
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None):
     """
 
@@ -62,15 +62,16 @@ class DCGAN(object):
     self.g_bn0 = batch_norm(name='g_bn0')
     self.g_bn1 = batch_norm(name='g_bn1')
     self.g_bn2 = batch_norm(name='g_bn2')
-
+    self.wgan = wgan
+    #if we do implement wGAN+CAN
     if not self.y_dim:
       self.g_bn3 = batch_norm(name='g_bn3')
 
     self.dataset_name = dataset_name
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
-    #print(self.dataset_name)
-    #print(self.input_fname_pattern) 
+    self.wgan = wgan
+    
     if self.dataset_name == 'mnist':
       self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
@@ -392,26 +393,18 @@ class DCGAN(object):
         h0 = tf.nn.relu(self.g_bn0(self.h0))
         self.h1, self.hw_w, self.hw_b = resizeconv(
              h0, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h1', with_w=True)
-        #self.h1, self.h1_w, self.h1_b = deconv2d(
-        #    h0, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h1', with_w=True)
         h1 = tf.nn.relu(self.g_bn1(self.h1))
 
         h2, self.h2_w, self.h2_b = resizeconv(
              h1, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h2', with_w=True)
-        #h2, self.h2_w, self.h2_b = deconv2d(
-        #    h1, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h2', with_w=True)
         h2 = tf.nn.relu(self.g_bn2(h2))
 
         h3, self.h3_w, self.h3_b = resizeconv(
             h2, [self.batch_size, s_h2, s_w2, self.gf_dim*1], name='g_h3', with_w=True)
-        #h3, self.h3_w, self.h3_b = deconv2d(
-        #    h2, [self.batch_size, s_h2, s_w2, self.gf_dim*1], name='g_h3', with_w=True)
         h3 = tf.nn.relu(self.g_bn3(h3))
 
         h4, self.h4_w, self.h4_b = resizeconv(
             h3, [self.batch_size, s_h, s_w, self.c_dim], name='g_h4', with_w=True)
-        #h4, self.h4_w, self.h4_b = deconv2d(
-        #    h3, [self.batch_size, s_h, s_w, self.c_dim], name='g_h4', with_w=True)
 
         return tf.nn.tanh(h4)
       else:
@@ -436,7 +429,7 @@ class DCGAN(object):
         h2 = tf.nn.relu(self.g_bn2(resizeconv(h1,
             [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2')))
         h2 = conv_cond_concat(h2, yb)
-        #above was identical except resizeconv <--> deconv2d
+        
         return tf.nn.sigmoid(
             resizeconv(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
         #above was identical except resizeconv <--> deconv2d
