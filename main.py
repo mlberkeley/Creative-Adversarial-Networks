@@ -59,7 +59,7 @@ def main(_):
           input_fname_pattern=FLAGS.input_fname_pattern,
           crop=FLAGS.crop,
           checkpoint_dir=FLAGS.checkpoint_dir,
-          sample_dir=FLAGS.sample_dir
+          sample_dir=FLAGS.sample_dir,
           wgan=FLAGS.wgan)
     elif FLAGS.dataset == 'wikiart':
       dcgan = DCGAN(
