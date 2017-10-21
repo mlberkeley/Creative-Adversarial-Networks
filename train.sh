@@ -1,4 +1,4 @@
-
+export CUDA_VISIBLE_DEVICES=0
 python3 main.py \
 --epoch 5 \
 --learning_rate .0002 \
