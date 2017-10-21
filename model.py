@@ -155,10 +155,10 @@ class DCGAN(object):
     
 
 
-    self.d_loss_real_sum   = scalar_summary("d_loss_real", self.d_loss_real)
-    self.d_loss_fake_sum   = scalar_summary("d_loss_fake", self.d_loss_fake)
-    self.d_loss_class_real = scalar_summary("d_loss_class_real", self.d_loss_class_real)
-    self.d_loss_class_fake = scalar_summary("d_loss_class_fake", self.d_loss_class_fake)   
+    self.d_loss_real_sum       = scalar_summary("d_loss_real", self.d_loss_real)
+    self.d_loss_fake_sum       = scalar_summary("d_loss_fake", self.d_loss_fake)
+    self.d_loss_class_real_sum = scalar_summary("d_loss_class_real", self.d_loss_class_real)
+    self.d_loss_class_fake_sum = scalar_summary("d_loss_class_fake", self.d_loss_class_fake)   
 
     print(self.d_loss_class_real.get_shape()) 
     self.d_loss = self.d_loss_real + self.d_loss_fake + self.d_loss_class_real
