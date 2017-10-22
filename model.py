@@ -208,8 +208,12 @@ class DCGAN(object):
 
     self.g_sum = merge_summary([self.z_sum, self.d__sum,
       self.G_sum, self.d_loss_fake_sum, self.g_loss_sum])
-    self.d_sum = merge_summary(
+    if self.can:
+      self.d_sum = merge_summary(
         [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum, self.d_loss_class_real_sum, self.d_loss_class_fake_sum])
+    else:
+      self.d_sum = merge_summary(
+        [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
     
     path = "./logs/lr=" + str(config.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)+"/"
     if not glob(path + "*"):
@@ -517,34 +521,34 @@ class DCGAN(object):
             z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
          
         self.h0 = tf.reshape(
-            self.z_, [-1, s_h64, s_w64, self.gf_dim * 16])
+            self.z_, [self.batch_size, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(self.h0))
-        h0 = conv_cond_concat([h0,y],1)
+        h0 = conv_cond_concat(h0, yb) 
         
         self.h1, self.hw_w, self.hw_b = resizeconv(
              h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1', with_w=True)
         h1 = tf.nn.relu(self.g_bn1(self.h1))            
-        h1 = conv_cond_concat([h1,y],1)
+        h1 = conv_cond_concat(h1, yb) 
         
         h2, self.h2_w, self.h2_b = resizeconv(
              h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2', with_w=True)
         h2 = tf.nn.relu(self.g_bn2(h2))
-        h2 = conv_cond_concat([h2,y],1)
+        h2 = conv_cond_concat(h2, yb) 
 
         h3, self.h3_w, self.h3_b = resizeconv(
             h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3', with_w=True)
         h3 = tf.nn.relu(self.g_bn3(h3))
-        h3 = conv_cond_concat([h3,y],1)
+        h3 = conv_cond_concat(h3, yb) 
 
         h4, self.h4_w, self.h4_b = resizeconv(
             h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4', with_w=True)
         h4 = tf.nn.relu(self.g_bn4(h4))
-        h4 = conv_cond_concat([h4,y],1)
+        h4 = conv_cond_concat(h4, yb) 
 
         h5, self.h5_w, self.h5_b = resizeconv(
             h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5', with_w=True)
         h5 = tf.nn.relu(self.g_bn5(h5))
-        h5 = conv_cond_concat([h5,y],1)
+        h5 = conv_cond_concat(h5, yb) 
 
         h6, self.h6_w, self.h6_w = resizeconv(
             h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6', with_w=True)
@@ -597,34 +601,35 @@ class DCGAN(object):
         s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
+        yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
         # project `z` and reshape
         self.z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 	
         h0 = tf.reshape(self.z_, [-1, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(self.h0, train=False))
-        h0 = conv_cond_concat([h0,y],1)
+        h0 = conv_cond_concat(h0,yb)
         
         #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
         
         h1 = resizeconv(h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
         h1 = tf.nn.relu(self.g_bn1(h1, train=False))
-        h1 = conv_cond_concat([h1,y],1)
+        h1 = conv_cond_concat(h1,yb)
 
         h2 = resizeconv(h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = tf.nn.relu(self.g_bn2(h2, train=False))
-        h2 = conv_cond_concat([h2,y],1)
+        h2 = conv_cond_concat(h2,yb)
 
         h3 = resizeconv(h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
         h3 = tf.nn.relu(self.g_bn3(h3, train=False))
-        h3 = conv_cond_concat([h3,y],1)
+        h3 = conv_cond_concat(h3,yb)
 
         h4 = resizeconv(h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4')
         h4 = tf.nn.relu(self.g_bn4(h4, train=False))
-        h4 = conv_cond_concat([h4,y],1)
+        h4 = conv_cond_concat(h4,yb)
 
         h5 = resizeconv(h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5')
         h5 = tf.nn.relu(self.g_bn5(h5, train=False))
-        h5 = conv_cond_concat([h5,y],1)
+        h5 = conv_cond_concat(h5,yb)
 
         h6 = resizeconv(h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6')
 
