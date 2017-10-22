@@ -127,25 +127,6 @@ class DCGAN(object):
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
       except:
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
-<<<<<<< HEAD
-
-    self.d_loss_real = tf.reduce_mean(
-      sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D)))
-    self.d_loss_fake = tf.reduce_mean(
-      sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
-    
-    self.d_loss_class_real = tf.reduce_mean(
-      tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c, labels=self.y))
-    
-    self.d_loss_class_fake = tf.reduce_mean(
-      tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_, 
-        labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
-    
-    self.g_loss = tf.reduce_mean(
-      sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_))) + self.d_loss_class_fake
-=======
->>>>>>> d66a2d88fe7861b9b9dab3cb49154ccd573f237b
-    
     if self.can:
       self.G                  = self.generator(self.z, self.y)
       self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(inputs, self.y, reuse=False)
