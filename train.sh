@@ -1,9 +1,9 @@
 export CUDA_VISIBLE_DEVICES=0
 python3 main.py \
---epoch 5 \
+--epoch 25 \
 --learning_rate .0002 \
 --beta 0.5 \
---batch_size 6 \
+--batch_size 16 \
 --input_height 128 \
 --output_height 128 \
 --dataset wikiart \

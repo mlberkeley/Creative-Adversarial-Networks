@@ -24,7 +24,8 @@ flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image s
 flags.DEFINE_boolean("train", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
-flags.DEFINE_boolean("wgan", False, "True if WGAN, False if regular GAN [False]")
+flags.DEFINE_boolean("wgan", False, "True if WGAN, False if regular [G/C]AN [False]")
+flags.DEFINE_boolean("can", True, "True if CAN, False if GAN [True]")
 FLAGS = flags.FLAGS
 
 def main(_):
@@ -60,7 +61,8 @@ def main(_):
           crop=FLAGS.crop,
           checkpoint_dir=FLAGS.checkpoint_dir,
           sample_dir=FLAGS.sample_dir,
-          wgan=FLAGS.wgan)
+          wgan=FLAGS.wgan,
+          can=FLAGS.can)
     elif FLAGS.dataset == 'wikiart':
       dcgan = DCGAN(
           sess,
@@ -76,7 +78,8 @@ def main(_):
           crop=FLAGS.crop,
           checkpoint_dir=FLAGS.checkpoint_dir,
           sample_dir=FLAGS.sample_dir,
-          wgan=FLAGS.wgan)
+          wgan=FLAGS.wgan,
+          can=FLAGS.can)
     else:
       dcgan = DCGAN(
           sess,
@@ -91,7 +94,8 @@ def main(_):
           crop=FLAGS.crop,
           checkpoint_dir=FLAGS.checkpoint_dir,
           sample_dir=FLAGS.sample_dir,
-          wgan=FLAGS.wgan)
+          wgan=FLAGS.wgan,
+          can=FLAGS.can)
 
     show_all_variables()
 

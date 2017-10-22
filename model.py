@@ -6,6 +6,7 @@ from glob import glob
 import tensorflow as tf
 import numpy as np
 from six.moves import xrange
+from random import shuffle
 
 from ops import *
 from utils import *
@@ -17,7 +18,7 @@ class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=32,
-         gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False,
+         gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False, can=True,
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None):
     """
 
@@ -147,7 +148,7 @@ class DCGAN(object):
       tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c, labels=self.y))
     
     self.d_loss_class_fake = tf.reduce_mean(
-      tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits_, 
+      tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_, 
         labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
     
     self.g_loss = tf.reduce_mean(
@@ -186,7 +187,7 @@ class DCGAN(object):
     self.g_sum = merge_summary([self.z_sum, self.d__sum,
       self.G_sum, self.d_loss_fake_sum, self.g_loss_sum])
     self.d_sum = merge_summary(
-        [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
+        [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum, self.d_loss_class_real_sum, self.d_loss_class_fake_sum])
     
     path = "./logs/lr=" + str(config.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)+"/"
     if not glob(path + "*"):
@@ -250,6 +251,7 @@ class DCGAN(object):
       else:      
         self.data = glob(os.path.join(
           "./data", config.dataset, self.input_fname_pattern))
+        shuffle(self.data)
         batch_idxs = min(len(self.data), config.train_size) // config.batch_size
 
       for idx in xrange(0, batch_idxs):
