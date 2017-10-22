@@ -71,6 +71,7 @@ class DCGAN(object):
       self.d_bn4 = batch_norm(name='d_bn4')
       self.d_bn5 = batch_norm(name='d_bn5')
     
+    self.can = can 
     self.wgan = wgan
     #if we do implement wGAN+CAN
 
@@ -121,23 +122,12 @@ class DCGAN(object):
       tf.float32, [None, self.z_dim], name='z')
     self.z_sum = histogram_summary("z", self.z)
 
-    self.G                  = self.generator(self.z, self.y)
-    self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(inputs, self.y, reuse=False)
-    
-    self.sampler            = self.sampler(self.z, self.y)
-    self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(self.G, self.y, reuse=True)
-    
-    self.d_sum = histogram_summary("d", self.D)
-    self.d__sum = histogram_summary("d_", self.D_)
-    self.d_c_sum = histogram_summary("d_c", self.D_c)
-    self.d_c__sum = histogram_summary("d_c_", self.D_c)
-    self.G_sum = image_summary("G", self.G)
-
     def sigmoid_cross_entropy_with_logits(x, y):
       try:
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
       except:
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
+<<<<<<< HEAD
 
     self.d_loss_real = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D)))
@@ -153,16 +143,67 @@ class DCGAN(object):
     
     self.g_loss = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_))) + self.d_loss_class_fake
+=======
+>>>>>>> d66a2d88fe7861b9b9dab3cb49154ccd573f237b
     
+    if self.can:
+      self.G                  = self.generator(self.z, self.y)
+      self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(inputs, self.y, reuse=False)
+      
+      self.sampler            = self.sampler(self.z, self.y)
+      self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(self.G, self.y, reuse=True)
+      
+      self.d_sum = histogram_summary("d", self.D)
+      self.d__sum = histogram_summary("d_", self.D_)
+      self.d_c_sum = histogram_summary("d_c", self.D_c)
+      self.d_c__sum = histogram_summary("d_c_", self.D_c)
+      self.G_sum = image_summary("G", self.G)
+
+      self.d_loss_real = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D)))
+      self.d_loss_fake = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
+      
+      self.d_loss_class_real = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c, labels=self.y))
+      
+      self.d_loss_class_fake = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits_, 
+          labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
+      
+      self.g_loss = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_))) + self.d_loss_class_fake
+      
 
 
-    self.d_loss_real_sum       = scalar_summary("d_loss_real", self.d_loss_real)
-    self.d_loss_fake_sum       = scalar_summary("d_loss_fake", self.d_loss_fake)
-    self.d_loss_class_real_sum = scalar_summary("d_loss_class_real", self.d_loss_class_real)
-    self.d_loss_class_fake_sum = scalar_summary("d_loss_class_fake", self.d_loss_class_fake)   
+      self.d_loss_real_sum       = scalar_summary("d_loss_real", self.d_loss_real)
+      self.d_loss_fake_sum       = scalar_summary("d_loss_fake", self.d_loss_fake)
+      self.d_loss_class_real_sum = scalar_summary("d_loss_class_real", self.d_loss_class_real)
+      self.d_loss_class_fake_sum = scalar_summary("d_loss_class_fake", self.d_loss_class_fake)   
 
-    print(self.d_loss_class_real.get_shape()) 
-    self.d_loss = self.d_loss_real + self.d_loss_fake + self.d_loss_class_real
+      self.d_loss = self.d_loss_real + self.d_loss_fake + self.d_loss_class_real
+    
+    else:
+      self.G                  = self.generator(self.z, self.y)
+      self.D, self.D_logits   = self.discriminator(inputs, self.y, reuse=False)
+      self.sampler            = self.sampler(self.z, self.y)
+      self.D_, self.D_logits_ = self.discriminator(self.G, self.y, reuse=True)
+      
+      self.d_sum = histogram_summary("d", self.D)
+      self.d__sum = histogram_summary("d_", self.D_)
+      self.G_sum = image_summary("G", self.G)   
+
+      self.d_loss_real = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D)))
+      self.d_loss_fake = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
+      self.g_loss = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_)))
+
+      self.d_loss_real_sum = scalar_summary("d_loss_real", self.d_loss_real)
+      self.d_loss_fake_sum = scalar_summary("d_loss_fake", self.d_loss_fake)
+                            
+      self.d_loss = self.d_loss_real + self.d_loss_fake
 
     self.g_loss_sum = scalar_summary("g_loss", self.g_loss)
     self.d_loss_sum = scalar_summary("d_loss", self.d_loss)
@@ -373,7 +414,7 @@ class DCGAN(object):
       if reuse:
         scope.reuse_variables()
 
-      if self.dataset_name=='wikiart':
+      if self.can:
         """
         256x256x3
         (4x4):
@@ -398,22 +439,27 @@ class DCGAN(object):
 
         return r_out, tf.nn.sigmoid(r_out), c_out, c_softmax
       else:
-        #Rewrite discriminator here to output class and real/fake
-
-        h0 = lrelu(conv2d(x, self.c_dim, name='d_h0_conv'))
-
-        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim, name='d_h1_conv')))
-        h1 = tf.reshape(h1, [self.batch_size, -1])      
-        
-        h2 = lrelu(self.d_bn2(linear(h1, self.dfc_dim, 'd_h2_lin')))
-
-        h3 = linear(h2, 1, 'd_h3_lin')
-        
-        return tf.nn.sigmoid(h3), h3
-
+        yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
+        image = conv_cond_concat(image, yb)
+        h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
+        h0 = conv_cond_concat(h0, yb)    
+        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
+        h1 = conv_cond_concat(h1, yb)    
+        h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
+        h2 = conv_cond_concat(h2, yb)    
+        h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
+        h3 = conv_cond_concat(h3, yb)    
+        h4 = lrelu(self.d_bn4(conv2d(h2, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
+        h4 = conv_cond_concat(h4, yb)    
+        h5 = lrelu(self.d_bn5(conv2d(h2, self.df_dim*16, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
+        h5 = tf.reshape(h5, [self.batch_size, -1]) 
+        h5 = concat([h5,y],1)
+                
+        r_out = linear(tf.reshape(h5, [self.batch_size, -1]), 1, 'd_ro_lin')
+        return r_out, tf.nn.sigmoid(r_out)
   def generator(self, z, y=None):
     with tf.variable_scope("generator") as scope:
-      if self.dataset_name == 'wikiart':
+      if self.can:
         """
         for wikiart:
         R^100
@@ -425,7 +471,7 @@ class DCGAN(object):
         128 x 128 x 64
         output: 256 x 256 x 3
         
-        does   n o t   use the y label!
+        CAN does not use the y label to generate.
         
         self.gf_dim = 64
         
@@ -441,7 +487,7 @@ class DCGAN(object):
         # project `z` and reshape
         self.z_, self.h0_w, self.h0_b = linear(
             z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
-	
+    
         self.h0 = tf.reshape(
             self.z_, [-1, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(self.h0))
@@ -471,28 +517,62 @@ class DCGAN(object):
 
         return tf.nn.tanh(h6)
       else:
-        s_h, s_w = self.output_height, self.output_width
-        s_h2, s_h4 = int(s_h/2), int(s_h/4)
-        s_w2, s_w4 = int(s_w/2), int(s_w/4)
-
-        h0 = tf.nn.relu(
-            self.g_bn0(linear(z, self.gfc_dim, 'g_h0_lin')))
-
-        h1 = tf.nn.relu(self.g_bn1(
-            linear(h0, self.gf_dim*2*s_h4*s_w4, 'g_h1_lin')))
-        h1 = tf.reshape(h1, [self.batch_size, s_h4, s_w4, self.gf_dim * 2])
-
-
-        h2 = tf.nn.relu(self.g_bn2(resizeconv(h1,
-            [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2')))
+        """
+        this is just for GAN. only diff is the addition of conditioning vectors
+        """
+        s_h, s_w = self.output_height, self.output_width #256/256
+        s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
+        s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
+        s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
+        s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
+        s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
+        s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
-        return tf.nn.sigmoid(
-            resizeconv(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
-        #above was identical except resizeconv <--> deconv2d
+        # project `z` and reshape
+        
+        yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
+        self.z_ = concat([z,y],1)
+        self.z_, self.h0_w, self.h0_b = linear(
+            z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
+         
+        self.h0 = tf.reshape(
+            self.z_, [-1, s_h64, s_w64, self.gf_dim * 16])
+        h0 = tf.nn.relu(self.g_bn0(self.h0))
+        h0 = conv_cond_concat([h0,y],1)
+        
+        self.h1, self.hw_w, self.hw_b = resizeconv(
+             h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1', with_w=True)
+        h1 = tf.nn.relu(self.g_bn1(self.h1))            
+        h1 = conv_cond_concat([h1,y],1)
+        
+        h2, self.h2_w, self.h2_b = resizeconv(
+             h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2', with_w=True)
+        h2 = tf.nn.relu(self.g_bn2(h2))
+        h2 = conv_cond_concat([h2,y],1)
+
+        h3, self.h3_w, self.h3_b = resizeconv(
+            h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3', with_w=True)
+        h3 = tf.nn.relu(self.g_bn3(h3))
+        h3 = conv_cond_concat([h3,y],1)
+
+        h4, self.h4_w, self.h4_b = resizeconv(
+            h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4', with_w=True)
+        h4 = tf.nn.relu(self.g_bn4(h4))
+        h4 = conv_cond_concat([h4,y],1)
+
+        h5, self.h5_w, self.h5_b = resizeconv(
+            h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5', with_w=True)
+        h5 = tf.nn.relu(self.g_bn5(h5))
+        h5 = conv_cond_concat([h5,y],1)
+
+        h6, self.h6_w, self.h6_w = resizeconv(
+            h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6', with_w=True)
+
+        return tf.nn.tanh(h6)
   def sampler(self, z, y=None):
     with tf.variable_scope("generator") as scope:
       scope.reuse_variables()
-      if self.dataset_name=='wikiart':
+      if self.can:
         s_h, s_w = self.output_height, self.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -528,20 +608,46 @@ class DCGAN(object):
 
         return tf.nn.tanh(h6)
       else:
-        s_h, s_w = self.output_height, self.output_width
-        s_h2, s_h4 = int(s_h/2), int(s_h/4)
-        s_w2, s_w4 = int(s_w/2), int(s_w/4)
+        s_h, s_w = self.output_height, self.output_width #256/256
+        s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
+        s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
+        s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
+        s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
+        s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
+        s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
+        
+        # project `z` and reshape
+        self.z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
+	
+        h0 = tf.reshape(self.z_, [-1, s_h64, s_w64, self.gf_dim * 16])
+        h0 = tf.nn.relu(self.g_bn0(self.h0, train=False))
+        h0 = conv_cond_concat([h0,y],1)
+        
+        #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
+        
+        h1 = resizeconv(h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
+        h1 = tf.nn.relu(self.g_bn1(h1, train=False))
+        h1 = conv_cond_concat([h1,y],1)
 
-        h0 = tf.nn.relu(self.g_bn0(linear(z, self.gfc_dim, 'g_h0_lin'), train=False))
+        h2 = resizeconv(h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+        h2 = tf.nn.relu(self.g_bn2(h2, train=False))
+        h2 = conv_cond_concat([h2,y],1)
 
-        h1 = tf.nn.relu(self.g_bn1(
-            linear(h0, self.gf_dim*2*s_h4*s_w4, 'g_h1_lin'), train=False))
-        h1 = tf.reshape(h1, [self.batch_size, s_h4, s_w4, self.gf_dim * 2])
+        h3 = resizeconv(h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+        h3 = tf.nn.relu(self.g_bn3(h3, train=False))
+        h3 = conv_cond_concat([h3,y],1)
 
-        h2 = tf.nn.relu(self.g_bn2(
-            resizeconv(h1, [self.batch_size, s_h2, s_w2, self.gf_dim * 2], name='g_h2'), train=False))
+        h4 = resizeconv(h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4')
+        h4 = tf.nn.relu(self.g_bn4(h4, train=False))
+        h4 = conv_cond_concat([h4,y],1)
 
-        return tf.nn.sigmoid(resizeconv(h2, [self.batch_size, s_h, s_w, self.c_dim], name='g_h3'))
+        h5 = resizeconv(h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5')
+        h5 = tf.nn.relu(self.g_bn5(h5, train=False))
+        h5 = conv_cond_concat([h5,y],1)
+
+        h6 = resizeconv(h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6')
+
+        return tf.nn.tanh(h6)
   
   def get_y(self, sample_inputs):
     ret = []
