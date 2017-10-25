@@ -57,20 +57,18 @@ class DCGAN(object):
     # batch normalization : deals with poor initialization helps gradient flow
     self.d_bn1 = batch_norm(name='d_bn1')
     self.d_bn2 = batch_norm(name='d_bn2')
+    self.d_bn3 = batch_norm(name='d_bn3')
+    self.d_bn4 = batch_norm(name='d_bn4')
+    self.d_bn5 = batch_norm(name='d_bn5')
 
     self.g_bn0 = batch_norm(name='g_bn0')
     self.g_bn1 = batch_norm(name='g_bn1')
     self.g_bn2 = batch_norm(name='g_bn2')
     
-    if self.dataset_name == 'wikiart':
-      self.g_bn3 = batch_norm(name='g_bn3')
-      self.g_bn4 = batch_norm(name='g_bn4')
-      self.g_bn5 = batch_norm(name='g_bn5')    
+    self.g_bn3 = batch_norm(name='g_bn3')
+    self.g_bn4 = batch_norm(name='g_bn4')
+    self.g_bn5 = batch_norm(name='g_bn5')    
 
-      self.d_bn3 = batch_norm(name='d_bn3')
-      self.d_bn4 = batch_norm(name='d_bn4')
-      self.d_bn5 = batch_norm(name='d_bn5')
-    
     self.can = can 
     self.wgan = wgan
     #if we do implement wGAN+CAN
@@ -83,6 +81,7 @@ class DCGAN(object):
       self.c_dim = self.data_X[0].shape[-1]
     elif self.dataset_name == 'wikiart':
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
+      shuffle(self.data)
       self.c_dim = 3
       self.label_dict = {}
       path_list = glob('./data/wikiart/**/', recursive=True)[1:]
@@ -90,6 +89,9 @@ class DCGAN(object):
         print(elem[15:-1])
         self.label_dict[elem[15:-1]] = i
       self.data_y = self.get_y(self.data)
+      print("data y verification:")
+      print(self.data[2390:2395])
+      print(self.data_y[2390:2395])
     else:
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
       imreadImg = imread(self.data[0]);
@@ -214,8 +216,9 @@ class DCGAN(object):
     else:
       self.d_sum = merge_summary(
         [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
-    
+
     path = "./logs/can="+str(self.can)+",lr=" + str(config.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)+"/"
+
     if not glob(path + "*"):
       path = path + "000"
       print(path)
@@ -226,8 +229,8 @@ class DCGAN(object):
       print(path+(3-len(num))*"0"+num)
       self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
     
-    #sample_z = np.random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
-    sample_z = np.random.normal(0, 1, size=(self.sample_num, self.z_dim))
+    sample_z = np.random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
+    #sample_z = np.random.normal(0, 1, size=(self.sample_num, self.z_dim))
  
     if config.dataset == 'mnist':
       sample_inputs = self.data_X[0:self.sample_num]
