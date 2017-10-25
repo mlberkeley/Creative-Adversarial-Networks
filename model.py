@@ -215,7 +215,7 @@ class DCGAN(object):
       self.d_sum = merge_summary(
         [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
     
-    path = "./logs/lr=" + str(config.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)+"/"
+    path = "./logs/can="+str(self.can)+",lr=" + str(config.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)+"/"
     if not glob(path + "*"):
       path = path + "000"
       print(path)
