@@ -24,7 +24,7 @@ flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image s
 flags.DEFINE_boolean("train", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
-flags.DEFINE_boolean("wgan", False, "True if WGAN, False if regular GAN [False]")
+flags.DEFINE_boolean("wgan", False, "True if WGAN, False if regular [G/C]AN [False]")
 flags.DEFINE_boolean("can", True, "True if CAN, False if regular GAN [True]")
 FLAGS = flags.FLAGS
 
