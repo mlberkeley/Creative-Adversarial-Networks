@@ -493,11 +493,11 @@ class DCGAN(object):
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         # project `z` and reshape
-        self.z_, self.h0_w, self.h0_b = linear(
-            z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
+        z_, self.h0_w, self.h0_b = linear(
+            self.z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
     
         h0 = tf.reshape(
-            self.z_, [-1, s_h64, s_w64, self.gf_dim * 16])
+            z_, [-1, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(h0))
 
         h1, self.hw_w, self.hw_b = resizeconv(
@@ -539,12 +539,12 @@ class DCGAN(object):
         # project `z` and reshape
         
         yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
-        z = concat([z,y],1)
-        self.z_, self.h0_w, self.h0_b = linear(
+        z = concat([self.z,y],1)
+        z_, self.h0_w, self.h0_b = linear(
             z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
          
         h0 = tf.reshape(
-            self.z_, [self.batch_size, s_h64, s_w64, self.gf_dim * 16])
+            z_, [self.batch_size, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(h0))
         h0 = conv_cond_concat(h0, yb) 
         
@@ -590,9 +590,9 @@ class DCGAN(object):
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         # project `z` and reshape
-        self.z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
+        z_ = linear(self.z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 	
-        h0 = tf.reshape(self.z_, [-1, s_h64, s_w64, self.gf_dim * 16])
+        h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(h0, train=False))
         
         #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
@@ -626,9 +626,10 @@ class DCGAN(object):
         
         yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
         # project `z` and reshape
-        self.z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
+        z = concat([self.z,y],1)
+        z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 	
-        h0 = tf.reshape(self.z_, [-1, s_h64, s_w64, self.gf_dim * 16])
+        h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(self.h0, train=False))
         h0 = conv_cond_concat(h0,yb)
         
