@@ -322,7 +322,7 @@ class DCGAN(object):
             feed_dict={
               self.z: batch_z,
             })
-          self.writer.add_sumary(summary_str, counter)
+          self.writer.add_summary(summary_str, counter)
         #CAN paper does not update G multiple times. 
           #do we need self.y for these two?
           errD_fake = self.d_loss_fake.eval({
@@ -337,11 +337,11 @@ class DCGAN(object):
               self.z: batch_z
           })
             
-          errD_real_class = self.d_loss_class_real.eval({
+          errD_class_real = self.d_loss_class_real.eval({
               self.inputs: batch_images,
               self.y: batch_labels
           })
-          errD_fake_class = self.d_loss_class_fake.eval({
+          errD_class_fake = self.d_loss_class_fake.eval({
               self.inputs: batch_images,
               self.z: batch_z
           })
