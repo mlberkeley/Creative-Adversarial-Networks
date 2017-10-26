@@ -210,9 +210,11 @@ class DCGAN(object):
 
     self.g_sum = merge_summary([self.z_sum, self.d__sum,
       self.G_sum, self.d_loss_fake_sum, self.g_loss_sum])
+
     if self.can:
       self.d_sum = merge_summary(
         [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum, self.d_loss_class_real_sum, self.d_loss_class_fake_sum])
+    
     else:
       self.d_sum = merge_summary(
         [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
@@ -235,7 +237,7 @@ class DCGAN(object):
     if config.dataset == 'mnist':
       sample_inputs = self.data_X[0:self.sample_num]
       sample_labels = self.data_y[0:self.sample_num]
-    elif config.dataset == 'wikiart':
+    elif self.y_dim:
       sample_files = self.data[0:self.sample_num]
       sample = [
           get_image(sample_file,
@@ -249,7 +251,8 @@ class DCGAN(object):
         sample_inputs = np.array(sample).astype(np.float32)[:, :, :, None]
       else:
         sample_inputs = np.array(sample).astype(np.float32)
-      sample_labels = np.eye(self.y_dim)[np.array(self.get_y(sample_files))]
+      sample_labels = self.get_y(sample_files)
+
     else:
       sample_files = self.data[0:self.sample_num]
       sample = [
@@ -301,12 +304,12 @@ class DCGAN(object):
             batch_images = np.array(batch).astype(np.float32)[:, :, :, None]
           else:
             batch_images = np.array(batch).astype(np.float32)
-          batch_labels = np.eye(self.y_dim)[np.array(self.get_y(batch_files))]
+          batch_labels = self.get_y(batch_filees) 
 
         batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
 
-        if config.dataset == 'mnist' or config.dataset == 'wikiart':
+        if self.y_dim:
           # Update D network
           _, summary_str = self.sess.run([d_optim, self.d_sum],
             feed_dict={ 
@@ -341,6 +344,16 @@ class DCGAN(object):
               self.z: batch_z,
               self.y: batch_labels
           })
+          if self.can:
+            errD_real_class = self.d_loss_class_real.eval({
+                self.inputs: batch_images,
+                self.y: batch_labels
+            })
+            errD_fake_class = self.d_loss_class_fake.eval({
+                self.inputs: batch_images,
+                self.y: batch_labels
+            })
+
         else:
           # Update D network
           _, summary_str = self.sess.run([d_optim, self.d_sum],
@@ -362,9 +375,15 @@ class DCGAN(object):
           errG = self.g_loss.eval({self.z: batch_z})
 
         counter += 1
-        print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
-          % (epoch, idx, batch_idxs,
-            time.time() - start_time, errD_fake+errD_real, errG))
+        if can:
+          print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
+            % (epoch, idx, batch_idxs,
+              time.time() - start_time, errD_fake+errD_real+errD_class_real, errG))
+
+        else:
+          print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
+            % (epoch, idx, batch_idxs,
+              time.time() - start_time, errD_fake+errD_real, errG))
 
         if np.mod(counter, 100) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
@@ -407,6 +426,7 @@ class DCGAN(object):
         256x256x3
         (4x4):
         32, 64, 128, 256, 512, 512 
+        doesn't use y, as it tries to predict y
         """
         #Common base of convolutions
         h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
@@ -476,13 +496,13 @@ class DCGAN(object):
         self.z_, self.h0_w, self.h0_b = linear(
             z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
     
-        self.h0 = tf.reshape(
+        h0 = tf.reshape(
             self.z_, [-1, s_h64, s_w64, self.gf_dim * 16])
-        h0 = tf.nn.relu(self.g_bn0(self.h0))
+        h0 = tf.nn.relu(self.g_bn0(h0))
 
-        self.h1, self.hw_w, self.hw_b = resizeconv(
+        h1, self.hw_w, self.hw_b = resizeconv(
              h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1', with_w=True)
-        h1 = tf.nn.relu(self.g_bn1(self.h1))
+        h1 = tf.nn.relu(self.g_bn1(h1))
 
         h2, self.h2_w, self.h2_b = resizeconv(
              h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2', with_w=True)
@@ -519,18 +539,18 @@ class DCGAN(object):
         # project `z` and reshape
         
         yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
-        self.z_ = concat([z,y],1)
+        z = concat([z,y],1)
         self.z_, self.h0_w, self.h0_b = linear(
             z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
          
-        self.h0 = tf.reshape(
+        h0 = tf.reshape(
             self.z_, [self.batch_size, s_h64, s_w64, self.gf_dim * 16])
-        h0 = tf.nn.relu(self.g_bn0(self.h0))
+        h0 = tf.nn.relu(self.g_bn0(h0))
         h0 = conv_cond_concat(h0, yb) 
         
-        self.h1, self.hw_w, self.hw_b = resizeconv(
+        h1, self.hw_w, self.hw_b = resizeconv(
              h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1', with_w=True)
-        h1 = tf.nn.relu(self.g_bn1(self.h1))            
+        h1 = tf.nn.relu(self.g_bn1(h1))            
         h1 = conv_cond_concat(h1, yb) 
         
         h2, self.h2_w, self.h2_b = resizeconv(
@@ -573,7 +593,7 @@ class DCGAN(object):
         self.z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 	
         h0 = tf.reshape(self.z_, [-1, s_h64, s_w64, self.gf_dim * 16])
-        h0 = tf.nn.relu(self.g_bn0(self.h0, train=False))
+        h0 = tf.nn.relu(self.g_bn0(h0, train=False))
         
         #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
         
@@ -642,7 +662,7 @@ class DCGAN(object):
     ret = []
     for sample in sample_inputs:
       lab_str = sample[15:15+sample[15:].find('/')]
-      ret.append(self.label_dict[lab_str])
+      ret.append(np.eye(self.y_dim)[np.array(self.label_dict[lab_str])])
     return ret 
 
   def load_mnist(self):
