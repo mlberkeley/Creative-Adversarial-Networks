@@ -133,9 +133,12 @@ def visualize(sess, dcgan, config, option):
         y_one_hot[np.arange(config.batch_size), y] = 1
 
         samples = sess.run(dcgan.sampler, feed_dict={dcgan.z: z_sample, dcgan.y: y_one_hot})
-      else:
-        samples = sess.run(dcgan.sampler, feed_dict={dcgan.z: z_sample})
+      elif config.dataset == 'wikiart':
+        y = np.random.choice(27, config.batch_size)
+        y_one_hot = np.zeros((config.batch_size, 27))
+        y_one_hot[np.arange(config.batch_size), y] = 1
 
+        samples = sess.run(dcgan.sampler, feed_dict={dcgan.z: z_sample, dcgan.y: y_one_hot})
       save_images(samples, [image_frame_dim, image_frame_dim], './samples/test_arange_%s.png' % (idx))
   elif option == 2:
     values = np.arange(0, 1, 1./config.batch_size)
@@ -153,9 +156,13 @@ def visualize(sess, dcgan, config, option):
         y_one_hot[np.arange(config.batch_size), y] = 1
 
         samples = sess.run(dcgan.sampler, feed_dict={dcgan.z: z_sample, dcgan.y: y_one_hot})
-      else:
-        samples = sess.run(dcgan.sampler, feed_dict={dcgan.z: z_sample})
+      elif config.dataset == 'wikiart':
+        y = np.random.choice(27, config.batch_size)
+        y_one_hot = np.zeros((config.batch_size, 27))
+        y_one_hot[np.arange(config.batch_size), y] = 1
 
+        samples = sess.run(dcgan.sampler, feed_dict={dcgan.z: z_sample, dcgan.y: y_one_hot})
+        
       try:
         make_gif(samples, './samples/test_gif_%s.gif' % (idx))
       except:

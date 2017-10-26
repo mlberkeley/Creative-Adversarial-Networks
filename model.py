@@ -124,12 +124,15 @@ class DCGAN(object):
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
       except:
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
+
     if self.can:
-      self.G                  = self.generator(self.z, self.y)
-      self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(inputs, self.y, reuse=False)
+      self.G                  = self.generator(self.z)
+      self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
+                                                                inputs, reuse=False)
       
-      self.sampler            = self.sampler(self.z, self.y)
-      self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(self.G, self.y, reuse=True)
+      self.sampler            = self.sampler(self.z)
+      self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
+                                                                self.G, reuse=True)
       
       self.d_sum = histogram_summary("d", self.D)
       self.d__sum = histogram_summary("d_", self.D_)
@@ -150,7 +153,8 @@ class DCGAN(object):
           labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
       
       self.g_loss = tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_))) + self.d_loss_class_fake
+        sigmoid_cross_entropy_with_logits(
+          self.D_logits_, tf.ones_like(self.D_))) + self.d_loss_class_fake
       
 
 
@@ -304,7 +308,45 @@ class DCGAN(object):
         batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
 
-        if self.y_dim:
+        if self.can:
+        #update D
+          _, summary_str = self.sess.run([d_optim, self.d_sum],
+            feed_dict={
+              self.inputs: batch_images,
+              self.z: batch_z,
+              self.y: batch_labels,
+            })
+          self.writer.add_summary(summary_str,counter)
+        #Update G: don't need labels or inputs
+          _, summary_str = self.sess.run([g_optim, self.g_sum],
+            feed_dict={
+              self.z: batch_z,
+            })
+          self.writer.add_sumary(summary_str, counter)
+        #CAN paper does not update G multiple times. 
+          #do we need self.y for these two?
+          errD_fake = self.d_loss_fake.eval({
+              self.z: batch_z, 
+              self.y:batch_labels
+          })
+          errD_real = self.d_loss_real.eval({
+              self.inputs: batch_images,
+              self.y:batch_labels
+          })
+          errG = self.g_loss.eval({
+              self.z: batch_z
+          })
+            
+          errD_real_class = self.d_loss_class_real.eval({
+              self.inputs: batch_images,
+              self.y: batch_labels
+          })
+          errD_fake_class = self.d_loss_class_fake.eval({
+              self.inputs: batch_images,
+              self.z: batch_z
+          })
+
+        else:
           # Update D network
           _, summary_str = self.sess.run([d_optim, self.d_sum],
             feed_dict={ 
@@ -339,35 +381,6 @@ class DCGAN(object):
               self.z: batch_z,
               self.y: batch_labels
           })
-          if self.can:
-            errD_real_class = self.d_loss_class_real.eval({
-                self.inputs: batch_images,
-                self.y: batch_labels
-            })
-            errD_fake_class = self.d_loss_class_fake.eval({
-                self.inputs: batch_images,
-                self.y: batch_labels
-            })
-
-        else:
-          # Update D network
-          _, summary_str = self.sess.run([d_optim, self.d_sum],
-            feed_dict={ self.inputs: batch_images, self.z: batch_z })
-          self.writer.add_summary(summary_str, counter)
-
-          # Update G network
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
-            feed_dict={ self.z: batch_z })
-          self.writer.add_summary(summary_str, counter)
-
-          # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
-            feed_dict={ self.z: batch_z })
-          self.writer.add_summary(summary_str, counter)
-          
-          errD_fake = self.d_loss_fake.eval({ self.z: batch_z })
-          errD_real = self.d_loss_real.eval({ self.inputs: batch_images })
-          errG = self.g_loss.eval({self.z: batch_z})
 
         counter += 1
         if self.can:
@@ -488,35 +501,35 @@ class DCGAN(object):
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         # project `z` and reshape
-        z_, self.h0_w, self.h0_b = linear(
-            z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
+        z_ = linear(
+            z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
     
         h0 = tf.reshape(
             z_, [-1, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(h0))
 
-        h1, self.hw_w, self.hw_b = resizeconv(
-             h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1', with_w=True)
+        h1 = resizeconv(
+             h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
         h1 = tf.nn.relu(self.g_bn1(h1))
 
-        h2, self.h2_w, self.h2_b = resizeconv(
-             h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2', with_w=True)
+        h2 = resizeconv(
+             h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = tf.nn.relu(self.g_bn2(h2))
 
-        h3, self.h3_w, self.h3_b = resizeconv(
-            h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3', with_w=True)
+        h3 = resizeconv(
+            h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
         h3 = tf.nn.relu(self.g_bn3(h3))
 
-        h4, self.h4_w, self.h4_b = resizeconv(
-            h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4', with_w=True)
+        h4 = resizeconv(
+            h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4')
         h4 = tf.nn.relu(self.g_bn4(h4))
 
-        h5, self.h5_w, self.h5_b = resizeconv(
-            h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5', with_w=True)
+        h5 = resizeconv(
+            h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5')
         h5 = tf.nn.relu(self.g_bn5(h5))
 
-        h6, self.h6_w, self.h6_w = resizeconv(
-            h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6', with_w=True)
+        h6 = resizeconv(
+            h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6')
 
         return tf.nn.tanh(h6)
       else:
@@ -535,41 +548,41 @@ class DCGAN(object):
         
         yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
         z = concat([z,y],1)
-        z_, self.h0_w, self.h0_b = linear(
-            z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
+        z_ = linear(
+            z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
          
         h0 = tf.reshape(
             z_, [self.batch_size, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(h0))
         h0 = conv_cond_concat(h0, yb) 
         
-        h1, self.hw_w, self.hw_b = resizeconv(
-             h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1', with_w=True)
+        h1 = resizeconv(
+             h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
         h1 = tf.nn.relu(self.g_bn1(h1))            
         h1 = conv_cond_concat(h1, yb) 
         
-        h2, self.h2_w, self.h2_b = resizeconv(
-             h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2', with_w=True)
+        h2 = resizeconv(
+             h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = tf.nn.relu(self.g_bn2(h2))
         h2 = conv_cond_concat(h2, yb) 
 
-        h3, self.h3_w, self.h3_b = resizeconv(
-            h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3', with_w=True)
+        h3 = resizeconv(
+            h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
         h3 = tf.nn.relu(self.g_bn3(h3))
         h3 = conv_cond_concat(h3, yb) 
 
-        h4, self.h4_w, self.h4_b = resizeconv(
-            h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4', with_w=True)
+        h4 = resizeconv(
+            h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4')
         h4 = tf.nn.relu(self.g_bn4(h4))
         h4 = conv_cond_concat(h4, yb) 
 
-        h5, self.h5_w, self.h5_b = resizeconv(
-            h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5', with_w=True)
+        h5 = resizeconv(
+            h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5')
         h5 = tf.nn.relu(self.g_bn5(h5))
         h5 = conv_cond_concat(h5, yb) 
 
-        h6, self.h6_w, self.h6_w = resizeconv(
-            h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6', with_w=True)
+        h6 = resizeconv(
+            h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6')
 
         return tf.nn.tanh(h6)
   def sampler(self, z, y=None):
@@ -586,7 +599,6 @@ class DCGAN(object):
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         # project `z` and reshape
-        z = concat([z,y],1)
         z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 	
         h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
