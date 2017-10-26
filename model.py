@@ -586,7 +586,6 @@ class DCGAN(object):
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         # project `z` and reshape
-        z = concat([z,y],1)
         z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 	
         h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])

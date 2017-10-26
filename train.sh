@@ -12,5 +12,5 @@ python3 main.py \
 --sample_dir samples \
 --crop False \
 --visualize False \
---can False \
+--can True \
 --train
