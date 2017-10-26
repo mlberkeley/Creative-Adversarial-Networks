@@ -124,12 +124,15 @@ class DCGAN(object):
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
       except:
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
+
     if self.can:
-      self.G                  = self.generator(self.z, self.y)
-      self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(inputs, self.y, reuse=False)
+      self.G                  = self.generator(self.z)
+      self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
+                                                                inputs, reuse=False)
       
-      self.sampler            = self.sampler(self.z, self.y)
-      self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(self.G, self.y, reuse=True)
+      self.sampler            = self.sampler(self.z)
+      self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
+                                                                self.G, reuse=True)
       
       self.d_sum = histogram_summary("d", self.D)
       self.d__sum = histogram_summary("d_", self.D_)
@@ -150,7 +153,8 @@ class DCGAN(object):
           labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
       
       self.g_loss = tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_))) + self.d_loss_class_fake
+        sigmoid_cross_entropy_with_logits(
+          self.D_logits_, tf.ones_like(self.D_))) + self.d_loss_class_fake
       
 
 
@@ -304,7 +308,45 @@ class DCGAN(object):
         batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
 
-        if self.y_dim:
+        if self.can:
+        #update D
+          _, summary_str = self.sess.run([d_optim, self.d_sum],
+            feed_dict={
+              self.inputs: batch_images,
+              self.z: batch_z,
+              self.y: batch_labels,
+            })
+          self.writer.add_summary(summary_str,counter)
+        #Update G: don't need labels or inputs
+          _, summary_str = self.sess.run([g_optim, self.g_sum],
+            feed_dict={
+              self.z: batch_z,
+            })
+          self.writer.add_sumary(summary_str, counter)
+        #CAN paper does not update G multiple times. 
+          #do we need self.y for these two?
+          errD_fake = self.d_loss_fake.eval({
+              self.z: batch_z, 
+              self.y:batch_labels
+          })
+          errD_real = self.d_loss_real.eval({
+              self.inputs: batch_images,
+              self.y:batch_labels
+          })
+          errG = self.g_loss.eval({
+              self.z: batch_z
+          })
+            
+          errD_real_class = self.d_loss_class_real.eval({
+              self.inputs: batch_images,
+              self.y: batch_labels
+          })
+          errD_fake_class = self.d_loss_class_fake.eval({
+              self.inputs: batch_images,
+              self.z: batch_z
+          })
+
+        else:
           # Update D network
           _, summary_str = self.sess.run([d_optim, self.d_sum],
             feed_dict={ 
@@ -339,35 +381,6 @@ class DCGAN(object):
               self.z: batch_z,
               self.y: batch_labels
           })
-          if self.can:
-            errD_real_class = self.d_loss_class_real.eval({
-                self.inputs: batch_images,
-                self.y: batch_labels
-            })
-            errD_fake_class = self.d_loss_class_fake.eval({
-                self.inputs: batch_images,
-                self.y: batch_labels
-            })
-
-        else:
-          # Update D network
-          _, summary_str = self.sess.run([d_optim, self.d_sum],
-            feed_dict={ self.inputs: batch_images, self.z: batch_z })
-          self.writer.add_summary(summary_str, counter)
-
-          # Update G network
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
-            feed_dict={ self.z: batch_z })
-          self.writer.add_summary(summary_str, counter)
-
-          # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
-            feed_dict={ self.z: batch_z })
-          self.writer.add_summary(summary_str, counter)
-          
-          errD_fake = self.d_loss_fake.eval({ self.z: batch_z })
-          errD_real = self.d_loss_real.eval({ self.inputs: batch_images })
-          errG = self.g_loss.eval({self.z: batch_z})
 
         counter += 1
         if self.can:
