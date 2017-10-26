@@ -304,7 +304,7 @@ class DCGAN(object):
             batch_images = np.array(batch).astype(np.float32)[:, :, :, None]
           else:
             batch_images = np.array(batch).astype(np.float32)
-          batch_labels = self.get_y(batch_filees) 
+          batch_labels = self.get_y(batch_files) 
 
         batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
@@ -375,7 +375,7 @@ class DCGAN(object):
           errG = self.g_loss.eval({self.z: batch_z})
 
         counter += 1
-        if can:
+        if self.can:
           print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD_fake+errD_real+errD_class_real, errG))
@@ -581,6 +581,7 @@ class DCGAN(object):
     with tf.variable_scope("generator") as scope:
       scope.reuse_variables()
       if self.can:
+        print("CAN???")
         s_h, s_w = self.output_height, self.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -590,7 +591,8 @@ class DCGAN(object):
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         # project `z` and reshape
-        z_ = linear(self.z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
+        z = concat([self.z,y],1)
+        z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 	
         h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(h0, train=False))
@@ -625,12 +627,11 @@ class DCGAN(object):
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
-        # project `z` and reshape
         z = concat([self.z,y],1)
         z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 	
         h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
-        h0 = tf.nn.relu(self.g_bn0(self.h0, train=False))
+        h0 = tf.nn.relu(self.g_bn0(h0, train=False))
         h0 = conv_cond_concat(h0,yb)
         
         #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
