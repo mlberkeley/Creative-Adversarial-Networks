@@ -440,7 +440,7 @@ class DCGAN(object):
         c_out = lrelu(linear(h7, self.y_dim, 'd_co_lin'))
         c_softmax = tf.nn.softmax(c_out)
 
-        return r_out, tf.nn.sigmoid(r_out), c_out, c_softmax
+        return tf.nn.sigmoid(r_out), r_out, c_softmax, c_out
       else:
         yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
         image = conv_cond_concat(image, yb)
@@ -459,7 +459,7 @@ class DCGAN(object):
         h5 = concat([h5,y],1)
                 
         r_out = linear(tf.reshape(h5, [self.batch_size, -1]), 1, 'd_ro_lin')
-        return r_out, tf.nn.sigmoid(r_out)
+        return tf.nn.sigmoid(r_out), r_out 
   def generator(self, z, y=None):
     with tf.variable_scope("generator") as scope:
       if self.can:
