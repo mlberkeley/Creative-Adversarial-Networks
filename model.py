@@ -81,17 +81,12 @@ class DCGAN(object):
       self.c_dim = self.data_X[0].shape[-1]
     elif self.dataset_name == 'wikiart':
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
-      shuffle(self.data)
       self.c_dim = 3
       self.label_dict = {}
       path_list = glob('./data/wikiart/**/', recursive=True)[1:]
       for i, elem in enumerate(path_list):
         print(elem[15:-1])
         self.label_dict[elem[15:-1]] = i
-      self.data_y = self.get_y(self.data)
-      print("data y verification:")
-      print(self.data[2390:2395])
-      print(self.data_y[2390:2395])
     else:
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
       imreadImg = imread(self.data[0]);
@@ -494,7 +489,7 @@ class DCGAN(object):
         
         # project `z` and reshape
         z_, self.h0_w, self.h0_b = linear(
-            self.z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
+            z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
     
         h0 = tf.reshape(
             z_, [-1, s_h64, s_w64, self.gf_dim * 16])
@@ -539,7 +534,7 @@ class DCGAN(object):
         # project `z` and reshape
         
         yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
-        z = concat([self.z,y],1)
+        z = concat([z,y],1)
         z_, self.h0_w, self.h0_b = linear(
             z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin', with_w=True)
          
@@ -591,7 +586,7 @@ class DCGAN(object):
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         # project `z` and reshape
-        z = concat([self.z,y],1)
+        z = concat([z,y],1)
         z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 	
         h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
@@ -627,7 +622,7 @@ class DCGAN(object):
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
-        z = concat([self.z,y],1)
+        z = concat([z,y],1)
         z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 	
         h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
