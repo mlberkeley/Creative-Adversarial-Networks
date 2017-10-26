@@ -441,15 +441,15 @@ class DCGAN(object):
         h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
         h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
         h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
-        h4 = lrelu(self.d_bn4(conv2d(h2, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
-        h5 = lrelu(self.d_bn5(conv2d(h2, self.df_dim*16, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
-        h5 = tf.reshape(h5, [self.batch_size, -1]) 
+        #h4 = lrelu(self.d_bn4(conv2d(h2, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
+        #h5 = lrelu(self.d_bn5(conv2d(h2, self.df_dim*16, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
+        h5 = tf.reshape(h3, [self.batch_size, -1]) 
         #linear layer to determine if the image is real/fake
         r_out = linear(tf.reshape(h5, [self.batch_size, -1]), 1, 'd_ro_lin')
         
         #fully connected layers to classify the image into the different styles.
-        h6 = lrelu(linear(h5, 1024, 'd_h6_lin'))
-        h7 = lrelu(linear(h6, 512, 'd_h7_lin'))
+        #h6 = lrelu(linear(h5, 1024, 'd_h6_lin'))
+        h7 = lrelu(linear(h5, 512, 'd_h7_lin'))
         c_out = lrelu(linear(h7, self.y_dim, 'd_co_lin'))
         c_softmax = tf.nn.softmax(c_out)
 
@@ -497,27 +497,28 @@ class DCGAN(object):
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
         s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
         s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
-        s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
-        s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
+        #s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
+        #s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         # project `z` and reshape
+        # for full experiment, this and the next line were s_(hw)64*16*gfdim
         z_ = linear(
-            z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
+            z, self.gf_dim*8*s_h16*s_w16, 'g_h0_lin')
     
         h0 = tf.reshape(
-            z_, [-1, s_h64, s_w64, self.gf_dim * 16])
+            z_, [-1, s_h16, s_w16, self.gf_dim *8 ])
         h0 = tf.nn.relu(self.g_bn0(h0))
 
-        h1 = resizeconv(
-             h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        h1 = tf.nn.relu(self.g_bn1(h1))
+        #h1 = resizeconv(
+        #     h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
+        #h1 = tf.nn.relu(self.g_bn1(h1))
 
-        h2 = resizeconv(
-             h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
-        h2 = tf.nn.relu(self.g_bn2(h2))
-
+        #h2 = resizeconv(
+        #     h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+        #h2 = tf.nn.relu(self.g_bn2(h2))
+        #for full experiment, make sure to change h0 below
         h3 = resizeconv(
-            h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+            h0, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
         h3 = tf.nn.relu(self.g_bn3(h3))
 
         h4 = resizeconv(
@@ -595,24 +596,24 @@ class DCGAN(object):
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
         s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
         s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
-        s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
-        s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
+        #s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
+        #s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
         # project `z` and reshape
-        z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
+        z_ = linear(z, self.gf_dim*8*s_h16*s_w16, 'g_h0_lin')
 	
-        h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
+        h0 = tf.reshape(z_, [-1, s_h16, s_w16, self.gf_dim * 8])
         h0 = tf.nn.relu(self.g_bn0(h0, train=False))
         
         #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
         
-        h1 = resizeconv(h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        h1 = tf.nn.relu(self.g_bn1(h1, train=False))
+        #h1 = resizeconv(h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
+        #h1 = tf.nn.relu(self.g_bn1(h1, train=False))
 
-        h2 = resizeconv(h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
-        h2 = tf.nn.relu(self.g_bn2(h2, train=False))
+        #h2 = resizeconv(h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+        #h2 = tf.nn.relu(self.g_bn2(h2, train=False))
 
-        h3 = resizeconv(h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+        h3 = resizeconv(h0, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
         h3 = tf.nn.relu(self.g_bn3(h3, train=False))
 
         h4 = resizeconv(h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4')
