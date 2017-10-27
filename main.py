@@ -11,6 +11,7 @@ flags = tf.app.flags
 flags.DEFINE_integer("epoch", 25, "Epoch to train [25]")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
+flags.DEFINE_float("smoothing", 0.9, "Smoothing term for discriminator real (class) loss [0.9]")
 flags.DEFINE_integer("train_size", np.inf, "The size of train images [np.inf]")
 flags.DEFINE_integer("batch_size", 64, "The size of batch images [64]")
 flags.DEFINE_integer("input_height", 108, "The size of image to use (will be center cropped). [108]")
@@ -56,6 +57,7 @@ def main(_):
           batch_size=FLAGS.batch_size,
           sample_num=FLAGS.batch_size,
           y_dim=10,
+          smoothing=FLAGS.smoothing,
           dataset_name=FLAGS.dataset,
           input_fname_pattern=FLAGS.input_fname_pattern,
           crop=FLAGS.crop,
@@ -73,6 +75,7 @@ def main(_):
           batch_size=FLAGS.batch_size,
           sample_num=FLAGS.batch_size,
           y_dim=27,
+          smoothing=FLAGS.smoothing,
           dataset_name=FLAGS.dataset,
           input_fname_pattern=FLAGS.input_fname_pattern,
           crop=FLAGS.crop,
@@ -91,6 +94,7 @@ def main(_):
           sample_num=FLAGS.batch_size,
           dataset_name=FLAGS.dataset,
           input_fname_pattern=FLAGS.input_fname_pattern,
+          smoothing=FLAGS.smoothing,
           crop=FLAGS.crop,
           checkpoint_dir=FLAGS.checkpoint_dir,
           sample_dir=FLAGS.sample_dir,

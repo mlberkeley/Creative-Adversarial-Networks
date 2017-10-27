@@ -17,7 +17,7 @@ def conv_out_size_same(size, stride):
 class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
-         y_dim=None, z_dim=100, gf_dim=64, df_dim=32,
+         y_dim=None, z_dim=100, gf_dim=64, df_dim=32, smoothing=0.9,
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False, can=True,
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None):
     """
@@ -68,6 +68,8 @@ class DCGAN(object):
     self.g_bn3 = batch_norm(name='g_bn3')
     self.g_bn4 = batch_norm(name='g_bn4')
     self.g_bn5 = batch_norm(name='g_bn5')    
+
+    self.smoothing = smoothing
 
     self.can = can 
     self.wgan = wgan
@@ -141,12 +143,12 @@ class DCGAN(object):
       self.G_sum = image_summary("G", self.G)
 
       self.d_loss_real = tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D)))
+        sigmoid_cross_entropy_with_logits(self.D_logits, self.smoothing * tf.ones_like(self.D)))
       self.d_loss_fake = tf.reduce_mean(
         sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
       
       self.d_loss_class_real = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c, labels=self.y))
+        tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c, labels=self.smoothing * self.y))
       
       self.d_loss_class_fake = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits_, 
@@ -176,7 +178,7 @@ class DCGAN(object):
       self.G_sum = image_summary("G", self.G)   
 
       self.d_loss_real = tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits, tf.ones_like(self.D)))
+        sigmoid_cross_entropy_with_logits(self.D_logits, self.smoothing * tf.ones_like(self.D)))
       self.d_loss_fake = tf.reduce_mean(
         sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
       self.g_loss = tf.reduce_mean(
