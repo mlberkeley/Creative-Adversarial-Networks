@@ -140,7 +140,7 @@ class DCGAN(object):
       self.d_sum = histogram_summary("d", self.D)
       self.d__sum = histogram_summary("d_", self.D_)
       self.d_c_sum = histogram_summary("d_c", self.D_c)
-      self.d_c__sum = histogram_summary("d_c_", self.D_c)
+      self.d_c__sum = histogram_summary("d_c_", self.D_c_)
       self.G_sum = image_summary("G", self.G)
 
       self.d_loss_real = tf.reduce_mean(
@@ -462,7 +462,7 @@ class DCGAN(object):
         image = conv_cond_concat(image, yb)
         h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
         h0 = conv_cond_concat(h0, yb)    
-        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*8, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
+        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*4, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
         h1 = conv_cond_concat(h1, yb)    
         #h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
         #h2 = conv_cond_concat(h2, yb)    
@@ -470,7 +470,7 @@ class DCGAN(object):
         #h3 = conv_cond_concat(h3, yb)    
         #h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
         #h4 = conv_cond_concat(h4, yb)    
-        h5 = lrelu(self.d_bn5(conv2d(h1, self.df_dim*16, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
+        h5 = lrelu(self.d_bn5(conv2d(h1, self.df_dim*8, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
         h5 = tf.reshape(h5, [self.batch_size, -1]) 
         h5 = concat([h5,y],1)
                 
@@ -677,7 +677,7 @@ class DCGAN(object):
   def get_y(self, sample_inputs):
     ret = []
     for sample in sample_inputs:
-      lab_str = sample[15:15+sample[15:].find('/')]
+      lab_str, _ = sample.split('/')
       ret.append(np.eye(self.y_dim)[np.array(self.label_dict[lab_str])])
     return ret 
 
