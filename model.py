@@ -681,7 +681,7 @@ class DCGAN(object):
   def get_y(self, sample_inputs):
     ret = []
     for sample in sample_inputs:
-      lab_str, _ = sample.split('/')
+      _, _, _, lab_str, _ = sample.split('/', 4)
       ret.append(np.eye(self.y_dim)[np.array(self.label_dict[lab_str])])
     return ret 
 
