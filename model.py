@@ -325,8 +325,12 @@ class DCGAN(object):
             feed_dict={
               self.z: batch_z,
             })
+          
+          _, summary_str = self.sess.run([g_optim, self.g_sum],
+            feed_dict={
+              self.z: batch_z,
+            })
           self.writer.add_summary(summary_str, counter)
-        #CAN paper does not update G multiple times. 
           #do we need self.y for these two?
           errD_fake = self.d_loss_fake.eval({
               self.z: batch_z, 
@@ -448,11 +452,11 @@ class DCGAN(object):
         #h5 = lrelu(self.d_bn5(conv2d(h4, self.df_dim*16, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
         h5 = tf.reshape(h3, [self.batch_size, -1]) 
         #linear layer to determine if the image is real/fake
-        r_out = linear(tf.reshape(h5, [self.batch_size, -1]), 1, 'd_ro_lin')
+        r_out = linear(h5, 1, 'd_ro_lin')
         
         #fully connected layers to classify the image into the different styles.
-        #h6 = lrelu(linear(h5, 1024, 'd_h6_lin'))
-        h7 = lrelu(linear(h5, 512, 'd_h7_lin'))
+        h6 = lrelu(linear(h5, 1024, 'd_h6_lin'))
+        h7 = lrelu(linear(h6, 512, 'd_h7_lin'))
         c_out = linear(h7, self.y_dim, 'd_co_lin')
         c_softmax = tf.nn.softmax(c_out)
 
@@ -677,7 +681,7 @@ class DCGAN(object):
   def get_y(self, sample_inputs):
     ret = []
     for sample in sample_inputs:
-      lab_str, _ = sample.split('/')
+      _, _, _, lab_str, _ = sample.split('/', 4)
       ret.append(np.eye(self.y_dim)[np.array(self.label_dict[lab_str])])
     return ret 
 
