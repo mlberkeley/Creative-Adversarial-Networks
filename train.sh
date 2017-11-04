@@ -1,9 +1,10 @@
 export CUDA_VISIBLE_DEVICES=1
 python3 main.py \
---epoch 25 \
---learning_rate .0002 \
+--epoch 10 \
+--learning_rate .0001 \
 --beta 0.5 \
---batch_size 36 \
+--batch_size 64 \
+--sample_size 64 \
 --input_height 28 \
 --output_height 28 \
 --dataset mnist \
@@ -12,5 +13,5 @@ python3 main.py \
 --sample_dir samples \
 --crop False \
 --visualize False \
---can False \
+--can True \
 --train

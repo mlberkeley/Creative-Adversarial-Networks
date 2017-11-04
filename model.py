@@ -104,7 +104,7 @@ class DCGAN(object):
 
   def build_model(self):
     if self.y_dim:
-      self.y = tf.placeholder(tf.float32, [self.batch_size, self.y_dim], name='y')
+      self.y = tf.placeholder(tf.float32, [None, self.y_dim], name='y')
     else:
       self.y = None
 
@@ -233,8 +233,8 @@ class DCGAN(object):
       print(path+(3-len(num))*"0"+num)
       self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
     
-    sample_z = np.random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
-    #sample_z = np.random.normal(0, 1, size=(self.sample_num, self.z_dim))
+    #sample_z = n0random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
+    sample_z = np.random.normal(0, 1, size=(self.sample_num, self.z_dim))
  
     if config.dataset == 'mnist':
       sample_inputs = self.data_X[0:self.sample_num]
@@ -308,7 +308,7 @@ class DCGAN(object):
             batch_images = np.array(batch).astype(np.float32)
           batch_labels = self.get_y(batch_files) 
 
-        batch_z = np.random.uniform(-1, 1, [config.batch_size, self.z_dim]) \
+        batch_z = np.random.normal(0, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
 
         if self.can:
@@ -326,10 +326,6 @@ class DCGAN(object):
               self.z: batch_z,
             })
           
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
-            feed_dict={
-              self.z: batch_z,
-            })
           self.writer.add_summary(summary_str, counter)
           #do we need self.y for these two?
           errD_fake = self.d_loss_fake.eval({
@@ -400,7 +396,7 @@ class DCGAN(object):
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD_fake+errD_real, errG))
 
-        if np.mod(counter, 100) == 1:
+        if np.mod(counter, 1000) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
             samples, d_loss, g_loss = self.sess.run(
               [self.sampler, self.d_loss, self.g_loss],
@@ -455,8 +451,8 @@ class DCGAN(object):
         r_out = linear(h5, 1, 'd_ro_lin')
         
         #fully connected layers to classify the image into the different styles.
-        h6 = lrelu(linear(h5, 1024, 'd_h6_lin'))
-        h7 = lrelu(linear(h6, 512, 'd_h7_lin'))
+        #h6 = lrelu(linear(h5, 1024, 'd_h6_lin'))
+        h7 = lrelu(linear(h5, 128, 'd_h7_lin'))
         c_out = linear(h7, self.y_dim, 'd_co_lin')
         c_softmax = tf.nn.softmax(c_out)
 
