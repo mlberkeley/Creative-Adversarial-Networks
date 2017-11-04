@@ -12,6 +12,7 @@ flags.DEFINE_integer("epoch", 25, "Epoch to train [25]")
 flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
 flags.DEFINE_float("smoothing", 0.9, "Smoothing term for discriminator real (class) loss [0.9]")
+flags.DEFINE_float("lambda_val", 1.0, "determines the relative importance of style ambiguity loss [1.0]")
 flags.DEFINE_integer("train_size", np.inf, "The size of train images [np.inf]")
 flags.DEFINE_integer("batch_size", 64, "The size of batch images [64]")
 flags.DEFINE_integer("sample_size", 64, "the size of sample images [64]")
@@ -28,6 +29,7 @@ flags.DEFINE_boolean("crop", False, "True for training, False for testing [False
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
 flags.DEFINE_boolean("wgan", False, "True if WGAN, False if regular [G/C]AN [False]")
 flags.DEFINE_boolean("can", True, "True if CAN, False if regular GAN [True]")
+
 FLAGS = flags.FLAGS
 
 def main(_):
@@ -59,6 +61,7 @@ def main(_):
           sample_num=FLAGS.sample_size,
           y_dim=10,
           smoothing=FLAGS.smoothing,
+          lamb = FLAGS.lambda_val,
           dataset_name=FLAGS.dataset,
           input_fname_pattern=FLAGS.input_fname_pattern,
           crop=FLAGS.crop,
@@ -77,6 +80,7 @@ def main(_):
           sample_num=FLAGS.sample_size,
           y_dim=27,
           smoothing=FLAGS.smoothing,
+          lamb = FLAGS.lambda_val,
           dataset_name=FLAGS.dataset,
           input_fname_pattern=FLAGS.input_fname_pattern,
           crop=FLAGS.crop,
@@ -97,6 +101,7 @@ def main(_):
           input_fname_pattern=FLAGS.input_fname_pattern,
           smoothing=FLAGS.smoothing,
           crop=FLAGS.crop,
+          lamb = FLAGS.lambda_val,
           checkpoint_dir=FLAGS.checkpoint_dir,
           sample_dir=FLAGS.sample_dir,
           wgan=FLAGS.wgan,

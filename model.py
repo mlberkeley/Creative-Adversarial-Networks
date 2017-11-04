@@ -17,7 +17,7 @@ def conv_out_size_same(size, stride):
 class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
-         y_dim=None, z_dim=100, gf_dim=64, df_dim=32, smoothing=0.9,
+         y_dim=None, z_dim=100, gf_dim=64, df_dim=32, smoothing=0.9, lamb = 1.0,
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False, can=True,
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None):
     """
@@ -70,6 +70,7 @@ class DCGAN(object):
     self.g_bn5 = batch_norm(name='g_bn5')    
 
     self.smoothing = smoothing
+    self.lamb = lamb
 
     self.can = can 
     self.wgan = wgan
@@ -153,7 +154,7 @@ class DCGAN(object):
       self.g_loss_fake = -tf.reduce_mean(tf.log(self.D_))
 
       self.d_loss = self.d_loss_real + self.d_loss_class_real + self.d_loss_fake
-      self.g_loss = self.g_loss_fake + self.g_loss_class_fake
+      self.g_loss = self.g_loss_fake + self.lamb * self.g_loss_class_fake
 
       self.d_loss_real_sum       = scalar_summary("d_loss_real", self.d_loss_real)
       self.d_loss_fake_sum       = scalar_summary("d_loss_fake", self.d_loss_fake)
@@ -314,6 +315,10 @@ class DCGAN(object):
             })
           self.writer.add_summary(summary_str,counter)
         #Update G: don't need labels or inputs
+          _, summary_str = self.sess.run([g_optim, self.g_sum],
+            feed_dict={
+              self.z: batch_z,
+            })
           _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={
               self.z: batch_z,
