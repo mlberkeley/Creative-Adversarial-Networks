@@ -7,7 +7,7 @@ python3 main.py \
 --sample_size 25 \
 --input_height 128 \
 --output_height 128 \
---lambda_val 1.0 \
+--lambda_val 0.1 \
 --smoothing 0.9 \
 --dataset wikiart \
 --input_fname_pattern */*.jpg \

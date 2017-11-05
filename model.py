@@ -515,7 +515,7 @@ class DCGAN(object):
         #h1 = tf.nn.relu(self.g_bn1(h1))
 
         h2 = resizeconv(
-             h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+             h0, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = tf.nn.relu(self.g_bn2(h2))
         
         h3 = resizeconv(
@@ -613,7 +613,7 @@ class DCGAN(object):
         #h1 = resizeconv(h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
         #h1 = tf.nn.relu(self.g_bn1(h1, train=False))
 
-        h2 = resizeconv(h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+        h2 = resizeconv(h0, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = tf.nn.relu(self.g_bn2(h2, train=False))
 
         h3 = resizeconv(h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
