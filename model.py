@@ -319,11 +319,6 @@ class DCGAN(object):
             feed_dict={
               self.z: batch_z,
             })
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
-            feed_dict={
-              self.z: batch_z,
-            })
-          
           self.writer.add_summary(summary_str, counter)
           #do we need self.y for these two?
           errD_fake = self.d_loss_fake.eval({
