@@ -115,7 +115,7 @@ class DCGAN(object):
       image_dims = [self.input_height, self.input_width, self.c_dim]
 
     self.inputs = tf.placeholder(
-      tf.float32, [self.batch_size] + image_dims, name='real_images')
+      tf.float32, [None] + image_dims, name='real_images')
 
     inputs = self.inputs
 
@@ -133,7 +133,7 @@ class DCGAN(object):
       self.G                  = self.generator(self.z)
       self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
                                                                 inputs, reuse=False)
-      
+      print("Made it past real inputs")
       self.sampler            = self.sampler(self.z)
       self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
                                                                 self.G, reuse=True)
@@ -424,7 +424,7 @@ class DCGAN(object):
     with tf.variable_scope("discriminator") as scope:
       if reuse:
         scope.reuse_variables()
-
+      batch_dim = tf.shape(image)[0]
       if self.can:
         """
         256x256x3
@@ -438,8 +438,8 @@ class DCGAN(object):
         h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
         h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
         h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
-        h5 = lrelu(self.d_bn5(conv2d(h4, self.df_dim*16, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
-        h5 = tf.reshape(h5, [self.batch_size, -1]) 
+        #h5 = lrelu(self.d_bn5(conv2d(h4, self.df_dim*16, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
+        h5 = tf.reshape(h4, [-1, 512])
         #linear layer to determine if the image is real/fake
         r_out = linear(h5, 1, 'd_ro_lin')
         
@@ -451,7 +451,7 @@ class DCGAN(object):
 
         return tf.nn.sigmoid(r_out), r_out, c_softmax, c_out
       else:
-        yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
+        yb = tf.reshape(y, [batch_dim, 1, 1, self.y_dim])
         image = conv_cond_concat(image, yb)
         h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
         h0 = conv_cond_concat(h0, yb)    
@@ -464,7 +464,7 @@ class DCGAN(object):
         #h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
         #h4 = conv_cond_concat(h4, yb)    
         h5 = lrelu(self.d_bn5(conv2d(h1, self.df_dim*8, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
-        h5 = tf.reshape(h5, [self.batch_size, -1]) 
+        h5 = tf.reshape(h5, [batch_dim, -1]) 
         h5 = concat([h5,y],1)
                 
         r_out = linear(tf.reshape(h5, [self.batch_size, -1]), 1, 'd_ro_lin')
@@ -495,7 +495,6 @@ class DCGAN(object):
         s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
         s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
-        
         # project `z` and reshape
         # for full experiment, this and the next line were s_(hw)64*16*gfdim
         z_ = linear(
@@ -510,23 +509,23 @@ class DCGAN(object):
         #h1 = tf.nn.relu(self.g_bn1(h1))
 
         h2 = resizeconv(
-             h0, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+             h0, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = tf.nn.relu(self.g_bn2(h2))
         
         h3 = resizeconv(
-            h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+            h2, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h3')
         h3 = tf.nn.relu(self.g_bn3(h3))
 
         h4 = resizeconv(
-            h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4')
+            h3, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h4')
         h4 = tf.nn.relu(self.g_bn4(h4))
 
         h5 = resizeconv(
-            h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5')
+            h4, [-1, s_h2, s_w2, self.gf_dim], name='g_h5')
         h5 = tf.nn.relu(self.g_bn5(h5))
 
         h6 = resizeconv(
-            h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6')
+            h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
 
         return tf.nn.tanh(h6)
       else:
@@ -550,43 +549,43 @@ class DCGAN(object):
         z_ = linear(
              z, 4 * self.gf_dim * s_h8 * s_w8, 'g_h0_lin') 
         #h0 = tf.reshape(
-        #    z_, [self.batch_size, s_h64, s_w64, self.gf_dim * 16])
+        #    z_, [-1, s_h64, s_w64, self.gf_dim * 16])
         #h0 = tf.nn.relu(self.g_bn0(h0))
         #h0 = conv_cond_concat(h0, yb) 
         
         #h1 = resizeconv(
-        #     h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
+        #     h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
         #h1 = tf.nn.relu(self.g_bn1(h1))            
         #h1 = conv_cond_concat(h1, yb) 
         
         #h2 = resizeconv(
-        #     h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+        #     h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         #h2 = tf.nn.relu(self.g_bn2(h2))
         #h2 = conv_cond_concat(h2, yb) 
         h2 = tf.reshape(
-            z_, [self.batch_size, s_h8, s_w8, self.gf_dim*4])
+            z_, [-1, s_h8, s_w8, self.gf_dim*4])
         h3 = resizeconv(
-            h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+            h2, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h3')
         h3 = tf.nn.relu(self.g_bn3(h3))
         h3 = conv_cond_concat(h3, yb) 
 
         h4 = resizeconv(
-            h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4')
+            h3, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h4')
         h4 = tf.nn.relu(self.g_bn4(h4))
         h4 = conv_cond_concat(h4, yb) 
 
         h5 = resizeconv(
-            h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5')
+            h4, [-1, s_h2, s_w2, self.gf_dim], name='g_h5')
         h5 = tf.nn.relu(self.g_bn5(h5))
         h5 = conv_cond_concat(h5, yb) 
 
         h6 = resizeconv(
-            h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6')
-
+            h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
         return tf.nn.tanh(h6)
   def sampler(self, z, y=None):
     with tf.variable_scope("generator") as scope:
       scope.reuse_variables()
+      batch_dim = tf.shape(z)[0]
       if self.can:
         print("CAN???")
         s_h, s_w = self.output_height, self.output_width #256/256
@@ -605,22 +604,22 @@ class DCGAN(object):
         
         #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
         
-        #h1 = resizeconv(h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
+        #h1 = resizeconv(h0, [batch_dim, s_h32, s_w32, self.gf_dim*16], name='g_h1')
         #h1 = tf.nn.relu(self.g_bn1(h1, train=False))
 
-        h2 = resizeconv(h0, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+        h2 = resizeconv(h0, [batch_dim, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = tf.nn.relu(self.g_bn2(h2, train=False))
 
-        h3 = resizeconv(h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+        h3 = resizeconv(h2, [batch_dim, s_h8, s_w8, self.gf_dim*4], name='g_h3')
         h3 = tf.nn.relu(self.g_bn3(h3, train=False))
 
-        h4 = resizeconv(h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4')
+        h4 = resizeconv(h3, [batch_dim, s_h4, s_w4, self.gf_dim*2], name='g_h4')
         h4 = tf.nn.relu(self.g_bn4(h4, train=False))
 
-        h5 = resizeconv(h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5')
+        h5 = resizeconv(h4, [batch_dim, s_h2, s_w2, self.gf_dim], name='g_h5')
         h5 = tf.nn.relu(self.g_bn5(h5, train=False))
 
-        h6 = resizeconv(h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6')
+        h6 = resizeconv(h5, [batch_dim, s_h, s_w, self.c_dim], name='g_h6')
 
         return tf.nn.tanh(h6)
       else:
@@ -632,7 +631,7 @@ class DCGAN(object):
         #s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
         #s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
         
-        yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
+        yb = tf.reshape(y, [batch_dim, 1, 1, self.y_dim])
         z = concat([z,y],1)
         #z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
         z_ = linear(z, 4 * self.gf_dim * s_h8 * s_w8, 'g_h0_lin')
@@ -643,27 +642,27 @@ class DCGAN(object):
         
         #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
         
-        #h1 = resizeconv(h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
+        #h1 = resizeconv(h0, [batch_dim, s_h32, s_w32, self.gf_dim*16], name='g_h1')
         #h1 = tf.nn.relu(self.g_bn1(h1, train=False))
         #h1 = conv_cond_concat(h1,yb)
 
-        #h2 = resizeconv(h1, [self.batch_size, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+        #h2 = resizeconv(h1, [batch_dim, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         #h2 = tf.nn.relu(self.g_bn2(h2, train=False))
         #h2 = conv_cond_concat(h2,yb)
 
-        h3 = resizeconv(h2, [self.batch_size, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+        h3 = resizeconv(h2, [batch_dim, s_h8, s_w8, self.gf_dim*4], name='g_h3')
         h3 = tf.nn.relu(self.g_bn3(h3, train=False))
         h3 = conv_cond_concat(h3,yb)
 
-        h4 = resizeconv(h3, [self.batch_size, s_h4, s_w4, self.gf_dim*2], name='g_h4')
+        h4 = resizeconv(h3, [batch_dim, s_h4, s_w4, self.gf_dim*2], name='g_h4')
         h4 = tf.nn.relu(self.g_bn4(h4, train=False))
         h4 = conv_cond_concat(h4,yb)
 
-        h5 = resizeconv(h4, [self.batch_size, s_h2, s_w2, self.gf_dim], name='g_h5')
+        h5 = resizeconv(h4, [batch_dim, s_h2, s_w2, self.gf_dim], name='g_h5')
         h5 = tf.nn.relu(self.g_bn5(h5, train=False))
         h5 = conv_cond_concat(h5,yb)
 
-        h6 = resizeconv(h5, [self.batch_size, s_h, s_w, self.c_dim], name='g_h6')
+        h6 = resizeconv(h5, [batch_dim, s_h, s_w, self.c_dim], name='g_h6')
 
         return tf.nn.tanh(h6)
   

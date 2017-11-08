@@ -4,12 +4,12 @@ python3 main.py \
 --learning_rate .0001 \
 --beta 0.5 \
 --batch_size 25 \
---sample_size 25 \
---input_height 128 \
---output_height 128 \
---lambda_val 0.1 \
+--sample_size 12 \
+--input_height 28 \
+--output_height 28 \
+--lambda_val 1.0 \
 --smoothing 0.9 \
---dataset wikiart \
+--dataset mnist \
 --input_fname_pattern */*.jpg \
 --checkpoint_dir checkpoint \
 --sample_dir samples \
