@@ -7,6 +7,7 @@ import tensorflow as tf
 import numpy as np
 from six.moves import xrange
 from random import shuffle
+from operator import mul
 
 from ops import *
 from utils import *
@@ -389,7 +390,7 @@ class DCGAN(object):
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD_fake+errD_real, errG))
 
-        if np.mod(counter, 1000) == 1:
+        if np.mod(counter, 5) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
             samples, d_loss, g_loss = self.sess.run(
               [self.sampler, self.d_loss, self.g_loss],
@@ -439,7 +440,8 @@ class DCGAN(object):
         h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
         h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
         #h5 = lrelu(self.d_bn5(conv2d(h4, self.df_dim*16, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
-        h5 = tf.reshape(h4, [-1, 512])
+        shape = np.product(h4.get_shape()[1:].as_list())
+        h5 = tf.reshape(h4, [-1, shape])
         #linear layer to determine if the image is real/fake
         r_out = linear(h5, 1, 'd_ro_lin')
         
@@ -464,7 +466,8 @@ class DCGAN(object):
         #h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
         #h4 = conv_cond_concat(h4, yb)    
         h5 = lrelu(self.d_bn5(conv2d(h1, self.df_dim*8, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))) 
-        h5 = tf.reshape(h5, [batch_dim, -1]) 
+        shape = np.product(h5.get_shape()[1:].as_list())
+        h5 = tf.reshape(h5, [-1, shape]) 
         h5 = concat([h5,y],1)
                 
         r_out = linear(tf.reshape(h5, [self.batch_size, -1]), 1, 'd_ro_lin')
