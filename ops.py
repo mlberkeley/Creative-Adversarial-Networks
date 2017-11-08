@@ -61,8 +61,8 @@ def conv2d(input_, output_dim,
     conv = tf.nn.conv2d(input_, w, strides=[1, d_h, d_w, 1], padding=padding)
 
     biases = tf.get_variable('biases', [output_dim], initializer=tf.constant_initializer(0.0))
-    conv = tf.reshape(tf.nn.bias_add(conv, biases), conv.get_shape())
-
+    out_shape = [-1] + conv.get_shape()[1:].as_list() 
+    conv = tf.reshape(tf.nn.bias_add(conv, biases), out_shape) 
     return conv
 
 def resizeconv(input_, output_dim,
@@ -85,7 +85,6 @@ def lrelu(x, leak=0.2, name="lrelu"):
 
 def linear(input_, output_size, scope=None, stddev=0.02, bias_start=0.0):
   shape = input_.get_shape().as_list()
-
   with tf.variable_scope(scope or "Linear"):
     matrix = tf.get_variable("Matrix", [shape[1], output_size], tf.float32,
                  tf.random_normal_initializer(stddev=stddev))
