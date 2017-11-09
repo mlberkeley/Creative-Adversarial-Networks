@@ -115,7 +115,7 @@ def main(_):
       if not dcgan.load(FLAGS.checkpoint_dir)[0]:
         raise Exception("[!] Train a model first, then run test mode")
       
-    OPTION = 1
+    OPTION = 0
     visualize(sess, dcgan, FLAGS, OPTION)
 
 if __name__ == '__main__':

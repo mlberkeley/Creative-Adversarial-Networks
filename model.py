@@ -136,6 +136,8 @@ class DCGAN(object):
       self.G                  = self.generator(self.z)
       self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
                                                                 inputs, reuse=False)
+      print(self.data_y)
+      print(self.data_y.shape)
       self.sampler            = self.sampler(self.z)
       self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
                                                                 self.G, reuse=True)
@@ -241,7 +243,7 @@ class DCGAN(object):
       self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
 
     #sample_z = n0random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
-    sample_z = np.random.normal(0, 1, size=(self.sample_num, self.z_dim))
+    sample_z = np.random.normal(0, 1, size=[self.sample_num, self.z_dim])
 
     if config.dataset == 'mnist':
       sample_inputs = self.data_X[0:self.sample_num]
@@ -515,18 +517,18 @@ class DCGAN(object):
         # project `z` and reshape
         # for full experiment, this and the next line were s_(hw)64*16*gfdim
         z_ = linear(
-            z, self.gf_dim*16*s_h32*s_w32, 'g_h0_lin')
+            z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 
         h0 = tf.reshape(
-            z_, [-1, s_h32, s_w32, self.gf_dim * 16 ])
+            z_, [-1, s_h64, s_w64, self.gf_dim * 16 ])
         h0 = tf.nn.relu(self.g_bn0(h0))
 
-        #h1 = resizeconv(
-        #     h0, [self.batch_size, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        #h1 = tf.nn.relu(self.g_bn1(h1))
+        h1 = resizeconv(
+             h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
+        h1 = tf.nn.relu(self.g_bn1(h1))
 
         h2 = resizeconv(
-             h0, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+             h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = tf.nn.relu(self.g_bn2(h2))
 
         h3 = resizeconv(
@@ -611,20 +613,20 @@ class DCGAN(object):
         s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
         s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
         s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
-        #s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
+        s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
 
         # project `z` and reshape
-        z_ = linear(z, self.gf_dim*16*s_h32*s_w32, 'g_h0_lin')
+        z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 
-        h0 = tf.reshape(z_, [-1, s_h32, s_w32, self.gf_dim * 16])
+        h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
         h0 = tf.nn.relu(self.g_bn0(h0, train=False))
 
         #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
 
-        #h1 = resizeconv(h0, [batch_dim, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        #h1 = tf.nn.relu(self.g_bn1(h1, train=False))
+        h1 = resizeconv(h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
+        h1 = tf.nn.relu(self.g_bn1(h1, train=False))
 
-        h2 = resizeconv(h0, [batch_dim, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+        h2 = resizeconv(h1, [batch_dim, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = tf.nn.relu(self.g_bn2(h2, train=False))
 
         h3 = resizeconv(h2, [batch_dim, s_h8, s_w8, self.gf_dim*4], name='g_h3')
