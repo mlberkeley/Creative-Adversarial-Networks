@@ -82,6 +82,8 @@ class DCGAN(object):
 
     if self.dataset_name == 'mnist':
       self.data_X, self.data_y = self.load_mnist()
+      print(self.data_y)
+      print(self.data_y.shape)
       self.c_dim = self.data_X[0].shape[-1]
     elif self.dataset_name == 'wikiart':
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
@@ -134,7 +136,6 @@ class DCGAN(object):
       self.G                  = self.generator(self.z)
       self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
                                                                 inputs, reuse=False)
-      print("Made it past real inputs")
       self.sampler            = self.sampler(self.z)
       self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
                                                                 self.G, reuse=True)
@@ -145,6 +146,9 @@ class DCGAN(object):
       self.d_c__sum = histogram_summary("d_c_", self.D_c_)
       self.G_sum = image_summary("G", self.G)
 
+      correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
+      self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+      
       # TODO change this to sigmoid_cross_entropy_with_logits
       self.d_loss_real = -tf.reduce_mean(tf.log(self.D))
       self.d_loss_class_real = tf.reduce_mean(
@@ -197,7 +201,7 @@ class DCGAN(object):
     self.saver = tf.train.Saver()
 
   def train(self, config):
-    d_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
+    d_optim = tf.train.AdamOptimizer(.1 * config.learning_rate, beta1=config.beta1) \
               .minimize(self.d_loss, var_list=self.d_vars)
     g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
               .minimize(self.g_loss, var_list=self.g_vars)
@@ -350,7 +354,10 @@ class DCGAN(object):
               self.inputs: batch_images,
               self.z: batch_z
           })
-
+          accuracy = self.accuracy.eval({
+              self.inputs: batch_images,
+              self.y: batch_labels
+          })
         else:
           # Update D network
           _, summary_str = self.sess.run([d_optim, self.d_sum],
@@ -392,13 +399,13 @@ class DCGAN(object):
           print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD_fake+errD_real+errD_class_real, errG))
-
+          print("Discriminator class acc: {}".format(accuracy))
         else:
           print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD_fake+errD_real, errG))
 
-        if np.mod(counter, 5) == 1:
+        if np.mod(counter, 500) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
             samples, d_loss, g_loss = self.sess.run(
               [self.sampler, self.d_loss, self.g_loss],
@@ -447,7 +454,6 @@ class DCGAN(object):
         h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
         h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
         h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
-        #h5 = lrelu(self.d_bn5(conv2d(h4, self.df_dim*16, k_h=4, k_w=4, name='d_h5_conv', padding='VALID')))
         shape = np.product(h4.get_shape()[1:].as_list())
         h5 = tf.reshape(h4, [-1, shape])
         #linear layer to determine if the image is real/fake
