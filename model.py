@@ -136,8 +136,6 @@ class DCGAN(object):
       self.G                  = self.generator(self.z)
       self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
                                                                 inputs, reuse=False)
-      print(self.data_y)
-      print(self.data_y.shape)
       self.sampler            = self.sampler(self.z)
       self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
                                                                 self.G, reuse=True)
@@ -150,15 +148,23 @@ class DCGAN(object):
 
       correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
       self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-      
+      true_label = tf.random_uniform(.7, 1.2, shape=self.D.get_shape())
+      false_label = tf.random_uniform(0.0, 0.3, shape=self.D_.get_shape())
+
+ 
       # TODO change this to sigmoid_cross_entropy_with_logits
-      self.d_loss_real = -tf.reduce_mean(tf.log(self.D))
+      self.d_loss_real = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D_logits, true_label * tf.ones_like(self.D)))
+      
+      self.d_loss_fake = tf.reduce_mean(
+        sigmoid_cross_entropy_with_logits(self.D_logits_, false_label * tf.ones_like(self.D_)))
+      
       self.d_loss_class_real = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits, labels=self.smoothing * self.y))
-      self.d_loss_fake = -tf.reduce_mean(tf.log(1-self.D_))
       self.g_loss_class_fake = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits_,
           labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
+      
       self.g_loss_fake = -tf.reduce_mean(tf.log(self.D_))
 
       self.d_loss = self.d_loss_real + self.d_loss_class_real + self.d_loss_fake
@@ -203,7 +209,7 @@ class DCGAN(object):
     self.saver = tf.train.Saver()
 
   def train(self, config):
-    d_optim = tf.train.AdamOptimizer(.1 * config.learning_rate, beta1=config.beta1) \
+    d_optim = tf.train.GradientDescentOptimizer(config.learning_rate, beta1=config.beta1) \
               .minimize(self.d_loss, var_list=self.d_vars)
     g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
               .minimize(self.g_loss, var_list=self.g_vars)
@@ -244,7 +250,8 @@ class DCGAN(object):
 
     #sample_z = n0random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
     sample_z = np.random.normal(0, 1, size=[self.sample_num, self.z_dim])
-
+    sample_z /= np.linalg.norm(sample_z, axis=0)
+    
     if config.dataset == 'mnist':
       sample_inputs = self.data_X[0:self.sample_num]
       sample_labels = self.data_y[0:self.sample_num]
@@ -319,6 +326,7 @@ class DCGAN(object):
 
         batch_z = np.random.normal(0, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
+        batch_z /= np.linalg.norm(batch_z, axis=0)
 
         if self.can:
         #update D
@@ -521,27 +529,27 @@ class DCGAN(object):
 
         h0 = tf.reshape(
             z_, [-1, s_h64, s_w64, self.gf_dim * 16 ])
-        h0 = tf.nn.relu(self.g_bn0(h0))
+        h0 = lrelu(self.g_bn0(h0))
 
         h1 = resizeconv(
              h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        h1 = tf.nn.relu(self.g_bn1(h1))
+        h1 = lrelu(self.g_bn1(h1))
 
         h2 = resizeconv(
              h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
-        h2 = tf.nn.relu(self.g_bn2(h2))
+        h2 = lrelu(self.g_bn2(h2))
 
         h3 = resizeconv(
             h2, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h3')
-        h3 = tf.nn.relu(self.g_bn3(h3))
+        h3 = lrelu(self.g_bn3(h3))
 
         h4 = resizeconv(
             h3, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h4')
-        h4 = tf.nn.relu(self.g_bn4(h4))
+        h4 = lrelu(self.g_bn4(h4))
 
         h5 = resizeconv(
             h4, [-1, s_h2, s_w2, self.gf_dim], name='g_h5')
-        h5 = tf.nn.relu(self.g_bn5(h5))
+        h5 = lrelu(self.g_bn5(h5))
 
         h6 = resizeconv(
             h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
@@ -569,33 +577,33 @@ class DCGAN(object):
              z, 4 * self.gf_dim * s_h8 * s_w8, 'g_h0_lin')
         #h0 = tf.reshape(
         #    z_, [-1, s_h64, s_w64, self.gf_dim * 16])
-        #h0 = tf.nn.relu(self.g_bn0(h0))
+        #h0 = lrelu(self.g_bn0(h0))
         #h0 = conv_cond_concat(h0, yb)
 
         #h1 = resizeconv(
         #     h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        #h1 = tf.nn.relu(self.g_bn1(h1))
+        #h1 = lrelu(self.g_bn1(h1))
         #h1 = conv_cond_concat(h1, yb)
 
         #h2 = resizeconv(
         #     h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
-        #h2 = tf.nn.relu(self.g_bn2(h2))
+        #h2 = lrelu(self.g_bn2(h2))
         #h2 = conv_cond_concat(h2, yb)
         h2 = tf.reshape(
             z_, [-1, s_h8, s_w8, self.gf_dim*4])
         h3 = resizeconv(
             h2, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h3')
-        h3 = tf.nn.relu(self.g_bn3(h3))
+        h3 = lrelu(self.g_bn3(h3))
         h3 = conv_cond_concat(h3, yb)
 
         h4 = resizeconv(
             h3, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h4')
-        h4 = tf.nn.relu(self.g_bn4(h4))
+        h4 = lrelu(self.g_bn4(h4))
         h4 = conv_cond_concat(h4, yb)
 
         h5 = resizeconv(
             h4, [-1, s_h2, s_w2, self.gf_dim], name='g_h5')
-        h5 = tf.nn.relu(self.g_bn5(h5))
+        h5 = lrelu(self.g_bn5(h5))
         h5 = conv_cond_concat(h5, yb)
 
         h6 = resizeconv(
@@ -619,24 +627,24 @@ class DCGAN(object):
         z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 
         h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
-        h0 = tf.nn.relu(self.g_bn0(h0, train=False))
+        h0 = lrelu(self.g_bn0(h0, train=False))
 
         #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
 
         h1 = resizeconv(h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        h1 = tf.nn.relu(self.g_bn1(h1, train=False))
+        h1 = lrelu(self.g_bn1(h1, train=False))
 
         h2 = resizeconv(h1, [batch_dim, s_h16, s_w16, self.gf_dim*8], name='g_h2')
-        h2 = tf.nn.relu(self.g_bn2(h2, train=False))
+        h2 = lrelu(self.g_bn2(h2, train=False))
 
         h3 = resizeconv(h2, [batch_dim, s_h8, s_w8, self.gf_dim*4], name='g_h3')
-        h3 = tf.nn.relu(self.g_bn3(h3, train=False))
+        h3 = lrelu(self.g_bn3(h3, train=False))
 
         h4 = resizeconv(h3, [batch_dim, s_h4, s_w4, self.gf_dim*2], name='g_h4')
-        h4 = tf.nn.relu(self.g_bn4(h4, train=False))
+        h4 = lrelu(self.g_bn4(h4, train=False))
 
         h5 = resizeconv(h4, [batch_dim, s_h2, s_w2, self.gf_dim], name='g_h5')
-        h5 = tf.nn.relu(self.g_bn5(h5, train=False))
+        h5 = lrelu(self.g_bn5(h5, train=False))
 
         h6 = resizeconv(h5, [batch_dim, s_h, s_w, self.c_dim], name='g_h6')
 
@@ -656,29 +664,29 @@ class DCGAN(object):
         z_ = linear(z, 4 * self.gf_dim * s_h8 * s_w8, 'g_h0_lin')
         h2 = tf.reshape(z_, [-1, s_h8, s_w8, self.gf_dim * 4])
         #h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
-        #h0 = tf.nn.relu(self.g_bn0(h0, train=False))
+        #h0 = lrelu(self.g_bn0(h0, train=False))
         #h0 = conv_cond_concat(h0,yb)
 
         #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
 
         #h1 = resizeconv(h0, [batch_dim, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        #h1 = tf.nn.relu(self.g_bn1(h1, train=False))
+        #h1 = lrelu(self.g_bn1(h1, train=False))
         #h1 = conv_cond_concat(h1,yb)
 
         #h2 = resizeconv(h1, [batch_dim, s_h16, s_w16, self.gf_dim*8], name='g_h2')
-        #h2 = tf.nn.relu(self.g_bn2(h2, train=False))
+        #h2 = lrelu(self.g_bn2(h2, train=False))
         #h2 = conv_cond_concat(h2,yb)
 
         h3 = resizeconv(h2, [batch_dim, s_h8, s_w8, self.gf_dim*4], name='g_h3')
-        h3 = tf.nn.relu(self.g_bn3(h3, train=False))
+        h3 = lrelu(self.g_bn3(h3, train=False))
         h3 = conv_cond_concat(h3,yb)
 
         h4 = resizeconv(h3, [batch_dim, s_h4, s_w4, self.gf_dim*2], name='g_h4')
-        h4 = tf.nn.relu(self.g_bn4(h4, train=False))
+        h4 = lrelu(self.g_bn4(h4, train=False))
         h4 = conv_cond_concat(h4,yb)
 
         h5 = resizeconv(h4, [batch_dim, s_h2, s_w2, self.gf_dim], name='g_h5')
-        h5 = tf.nn.relu(self.g_bn5(h5, train=False))
+        h5 = lrelu(self.g_bn5(h5, train=False))
         h5 = conv_cond_concat(h5,yb)
 
         h6 = resizeconv(h5, [batch_dim, s_h, s_w, self.c_dim], name='g_h6')
