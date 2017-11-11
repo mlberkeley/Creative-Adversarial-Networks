@@ -3,8 +3,8 @@ python3 main.py \
 --epoch 25 \
 --learning_rate .0001 \
 --beta 0.5 \
---batch_size 4 \
---sample_size 9 \
+--batch_size 64 \
+--sample_size 256 \
 --input_height 28 \
 --output_height 28 \
 --lambda_val 1.0 \

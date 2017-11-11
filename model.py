@@ -148,10 +148,9 @@ class DCGAN(object):
 
       correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
       self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-      true_label = tf.random_uniform(.7, 1.2, shape=self.D.get_shape())
-      false_label = tf.random_uniform(0.0, 0.3, shape=self.D_.get_shape())
-
- 
+      
+      true_label = tf.random_uniform(tf.shape(self.D),.7, 1.2)
+      false_label = tf.random_uniform(tf.shape(self.D_), 0.0, 0.3) 
       # TODO change this to sigmoid_cross_entropy_with_logits
       self.d_loss_real = tf.reduce_mean(
         sigmoid_cross_entropy_with_logits(self.D_logits, true_label * tf.ones_like(self.D)))
@@ -209,7 +208,7 @@ class DCGAN(object):
     self.saver = tf.train.Saver()
 
   def train(self, config):
-    d_optim = tf.train.GradientDescentOptimizer(config.learning_rate, beta1=config.beta1) \
+    d_optim = tf.train.GradientDescentOptimizer(config.learning_rate) \
               .minimize(self.d_loss, var_list=self.d_vars)
     g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
               .minimize(self.g_loss, var_list=self.g_vars)
