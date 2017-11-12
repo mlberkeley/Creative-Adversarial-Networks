@@ -151,7 +151,7 @@ class DCGAN(object):
       
       true_label = tf.random_uniform(tf.shape(self.D),.7, 1.2)
       false_label = tf.random_uniform(tf.shape(self.D_), 0.0, 0.3) 
-      # TODO change this to sigmoid_cross_entropy_with_logits
+
       self.d_loss_real = tf.reduce_mean(
         sigmoid_cross_entropy_with_logits(self.D_logits, true_label * tf.ones_like(self.D)))
       
@@ -408,7 +408,7 @@ class DCGAN(object):
           print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD_fake+errD_real+errD_class_real, errG))
-          print("Discriminator class acc: {}".format(accuracy))
+          print("Discriminator class acc: %.2f" % (accuracy))
         else:
           print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
