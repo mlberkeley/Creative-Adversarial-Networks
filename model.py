@@ -84,8 +84,6 @@ class DCGAN(object):
 
     if self.dataset_name == 'mnist':
       self.data_X, self.data_y = self.load_mnist()
-      print(self.data_y)
-      print(self.data_y.shape)
       self.c_dim = self.data_X[0].shape[-1]
     elif self.dataset_name == 'wikiart':
       self.data = glob(os.path.join("./data", self.dataset_name, self.input_fname_pattern))
@@ -149,7 +147,6 @@ class DCGAN(object):
       self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
                                                                 inputs, reuse=False)
       self.sampler            = self.sampler(self.z)
-      print('g:',self.G.get_shape())
       self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
                                                                 self.G, reuse=True)
 
@@ -527,7 +524,6 @@ class DCGAN(object):
         self.gf_dim = 64
 
         """
-        print("CAN Generator")
         s_h, s_w = self.output_height, self.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -567,7 +563,6 @@ class DCGAN(object):
         h6 = self.upsample(
             h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
 
-        print('h6:', h6.get_shape().as_list())
         return tf.nn.tanh(h6)
       else:
         """
@@ -627,7 +622,6 @@ class DCGAN(object):
     with tf.variable_scope("generator") as scope:
       scope.reuse_variables()
       if self.can:
-        print("CAN SAMPLER")
         s_h, s_w = self.output_height, self.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
