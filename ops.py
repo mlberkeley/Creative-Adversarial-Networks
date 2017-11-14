@@ -53,6 +53,7 @@ def conv2d(input_, output_dim,
        k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
        name="conv2d",padding='SAME'):
   with tf.variable_scope(name):
+    print('input', input_.get_shape().as_list())
     if padding=='VALID':
       paddings = np.array([[0,0],[1,1],[1,1],[0,0]])
       input_ = tf.pad(input_, paddings)
@@ -61,24 +62,46 @@ def conv2d(input_, output_dim,
     conv = tf.nn.conv2d(input_, w, strides=[1, d_h, d_w, 1], padding=padding)
 
     biases = tf.get_variable('biases', [output_dim], initializer=tf.constant_initializer(0.0))
-    out_shape = [-1] + conv.get_shape()[1:].as_list() 
+    out_shape = [-1] + conv.get_shape()[1:].as_list()
+    print(out_shape) 
     conv = tf.reshape(tf.nn.bias_add(conv, biases), out_shape) 
+    
     return conv
 
-def resizeconv(input_, output_dim,
+def resizeconv(input_, output_shape,
 		k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
 		name="resconv"):
   with tf.variable_scope(name):
     
-    resized = tf.image.resize_nearest_neighbor(input_,((output_dim[1]-1)*d_h + k_h-4, (output_dim[2]-1)*d_w + k_w-4))
+    resized = tf.image.resize_nearest_neighbor(input_,((output_shape[1]-1)*d_h + k_h-4, (output_shape[2]-1)*d_w + k_w-4))
     #The 4 is because of same padding in tf.nn.conv2d.
-    w = tf.get_variable('w', [k_h, k_w, resized.get_shape()[-1], output_dim[-1]],
+    w = tf.get_variable('w', [k_h, k_w, resized.get_shape()[-1], output_shape[-1]],
 		initializer=tf.truncated_normal_initializer(stddev=stddev))
     resconv = tf.nn.conv2d(resized, w, strides=[1, d_h, d_w, 1], padding='SAME')
-    biases = tf.get_variable('biases', output_dim[-1], initializer=tf.constant_initializer(0.0))
-
-    resconv = tf.reshape(tf.nn.bias_add(resconv, biases), output_dim)
+    biases = tf.get_variable('biases', output_shape[-1], initializer=tf.constant_initializer(0.0))
+    
     return resconv
+def deconv2d(input_, output_shape,
+       k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
+       name="deconv2d"):
+  with tf.variable_scope(name):
+    static_shape = input_.get_shape().as_list()
+    dyn_input_shape = tf.shape(input_)
+    batch_size = dyn_input_shape[0]
+    out_h = output_shape[1]
+    out_w = output_shape[2]
+    out_shape = tf.stack([batch_size, out_h, out_w, output_shape[-1]])
+
+    w = tf.get_variable('w', [k_h, k_w, output_shape[-1], input_.get_shape()[-1]],
+              initializer=tf.random_normal_initializer(stddev=stddev))
+     
+    deconv = tf.nn.conv2d_transpose(input_, w, output_shape=out_shape,
+                strides=[1, d_h, d_w, 1])
+    biases = tf.get_variable('biases', [output_shape[-1]], initializer=tf.constant_initializer(0.0))
+    deconv = tf.nn.bias_add(deconv, biases)
+    #deconv = tf.reshape(tf.nn.bias_add(deconv, biases), tf.shape(deconv))
+    deconv.set_shape([None] + output_shape[1:])
+    return deconv
 
 def lrelu(x, leak=0.2, name="lrelu"):
   return tf.maximum(x, leak*x)
