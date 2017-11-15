@@ -7,7 +7,7 @@ python3 main.py \
 --sample_size 72 \
 --input_height 128 \
 --output_height 128 \
---lambda_val 1.0 \
+--lambda_val 0.0 \
 --smoothing 1.0 \
 --use_resize True \
 --dataset wikiart \
