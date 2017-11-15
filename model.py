@@ -159,7 +159,7 @@ class DCGAN(object):
       correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
       self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
       
-      true_label = tf.random_uniform(tf.shape(self.D),.7, 1.2)
+      true_label = tf.random_uniform(tf.shape(self.D),.8, 1.2)
       false_label = tf.random_uniform(tf.shape(self.D_), 0.0, 0.3) 
 
       self.d_loss_real = tf.reduce_mean(
@@ -424,7 +424,7 @@ class DCGAN(object):
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD_fake+errD_real, errG))
 
-        if np.mod(counter, 500) == 1:
+        if np.mod(counter,400) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
             samples, d_loss, g_loss = self.sess.run(
               [self.sampler, self.d_loss, self.g_loss],
