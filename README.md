@@ -1,4 +1,8 @@
 # Creative Adversarial Networks
+![collage](assets/collage.jpg)
+
+*128x128 pixel Samples from CAN train on WikiART.*
+
 A WIP implementation of [CAN: Creative Adversarial Networks, Generating "Art" 
 by Learning About Styles and Deviating from Style Norms](https://arxiv.org/abs/1706.07068). 
 Repo bases DCGAN implementation on [DCGAN-tensorflow](https://github.com/carpedm20/DCGAN-tensorflow) 
