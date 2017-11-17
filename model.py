@@ -297,12 +297,12 @@ class DCGAN(object):
 
     counter = 1
     start_time = time.time()
-    #could_load, checkpoint_counter = self.load(self.checkpoint_dir)
-    #if could_load:
-    #  counter = checkpoint_counter
-    #  print(" [*] Load SUCCESS")
-    #else:
-    #  print(" [!] Load failed...")
+    could_load, checkpoint_counter = self.load(self.checkpoint_dir)
+    if could_load:
+      counter = checkpoint_counter
+      print(" [*] Load SUCCESS")
+    else:
+      print(" [!] Load failed...")
 
     for epoch in xrange(config.epoch):
       if config.dataset == 'mnist':
