@@ -53,7 +53,6 @@ def conv2d(input_, output_dim,
        k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
        name="conv2d",padding='SAME'):
   with tf.variable_scope(name):
-    print('input', input_.get_shape().as_list())
     if padding=='VALID':
       paddings = np.array([[0,0],[1,1],[1,1],[0,0]])
       input_ = tf.pad(input_, paddings)
@@ -63,7 +62,6 @@ def conv2d(input_, output_dim,
 
     biases = tf.get_variable('biases', [output_dim], initializer=tf.constant_initializer(0.0))
     out_shape = [-1] + conv.get_shape()[1:].as_list()
-    print(out_shape) 
     conv = tf.reshape(tf.nn.bias_add(conv, biases), out_shape) 
     
     return conv
@@ -80,7 +78,7 @@ def resizeconv(input_, output_shape,
     resconv = tf.nn.conv2d(resized, w, strides=[1, d_h, d_w, 1], padding='SAME')
     biases = tf.get_variable('biases', output_shape[-1], initializer=tf.constant_initializer(0.0))
     
-    return resconv
+    return tf.nn.bias_add(resconv, biases)
 def deconv2d(input_, output_shape,
        k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
        name="deconv2d"):
