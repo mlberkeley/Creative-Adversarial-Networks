@@ -3,11 +3,11 @@ python3 main.py \
 --epoch 25 \
 --learning_rate .0001 \
 --beta 0.5 \
---batch_size 28 \
+--batch_size 32 \
 --sample_size 81 \
 --input_height 128 \
 --output_height 128 \
---lambda_val 2.0 \
+--lambda_val 1.0 \
 --smoothing 1.0 \
 --use_resize True \
 --dataset wikiart \
