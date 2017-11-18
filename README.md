@@ -1,5 +1,5 @@
 # Creative Adversarial Networks
-![collage](assets/collage.jpg)
+![collage](assets/collage.png)
 
 *128x128 pixel Samples from CAN train on WikiART.*
 
