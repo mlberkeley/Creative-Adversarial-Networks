@@ -10,6 +10,7 @@ import scipy.misc
 import numpy as np
 from time import gmtime, strftime
 from six.moves import xrange
+from glob import glob
 
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
@@ -195,7 +196,13 @@ def visualize(sess, dcgan, config, option):
     new_image_set = [merge(np.array([images[idx] for images in image_set]), [10, 10]) \
         for idx in range(64) + range(63, -1, -1)]
     make_gif(new_image_set, './samples/test_gif_merged.gif', duration=8)
-
+def get_max_end(path_dir, num_len=3, fname_pattern='*.jpg'):
+  max_ = 0
+  for f in glob(path_dir + fname_pattern):
+    curr = int(f[-num_len-4:-4])
+    if curr > max_:
+      max_ = curr
+  return max_
 
 def image_manifold_size(num_images):
   print(num_images)
