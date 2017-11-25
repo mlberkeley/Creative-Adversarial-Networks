@@ -20,7 +20,7 @@ class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=32, smoothing=0.9, lamb = 1.0,
-         use_resize=False,
+         use_resize=False, replay=True,
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False, can=True,
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None):
     """
@@ -78,8 +78,8 @@ class DCGAN(object):
     self.can = can
     self.wgan = wgan
     self.use_resize = use_resize
-    #if we do implement wGAN+CAN
-
+    self.replay = replay
+    
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
     self.experience_flag = False
@@ -151,6 +151,11 @@ class DCGAN(object):
       self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
                                                                 inputs, reuse=False)
       self.sampler            = self.sampler(self.z)
+      
+
+
+
+
       if self.experience_flag:
         try:
           self.experience_selection = tf.convert_to_tensor(random.sample(self.experience_buffer, 16))
