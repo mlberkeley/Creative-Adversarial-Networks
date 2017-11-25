@@ -17,4 +17,5 @@ python3 main.py \
 --crop False \
 --visualize False \
 --can True \
+--replay True \
 --train

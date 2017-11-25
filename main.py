@@ -29,6 +29,7 @@ flags.DEFINE_boolean("crop", False, "True for training, False for testing [False
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
 flags.DEFINE_boolean("wgan", False, "True if WGAN, False if regular [G/C]AN [False]")
 flags.DEFINE_boolean("can", True, "True if CAN, False if regular GAN [True]")
+flags.DEFINE_boolean("replay", True, "True if using experience replay [True]")
 flags.DEFINE_boolean("use_resize", False, "True if resize conv for upsampling, False for fractionally strided conv [False]")
 FLAGS = flags.FLAGS
 
@@ -45,7 +46,6 @@ def main(_):
   if not os.path.exists(FLAGS.sample_dir):
     os.makedirs(FLAGS.sample_dir)
 
-  #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.333)
   run_config = tf.ConfigProto()
   run_config.gpu_options.allow_growth=True
 
@@ -60,6 +60,7 @@ def main(_):
           batch_size=FLAGS.batch_size,
           sample_num=FLAGS.sample_size,
           use_resize=FLAGS.use_resize,
+          replay=FLAGS.replay,
           y_dim=10,
           smoothing=FLAGS.smoothing,
           lamb = FLAGS.lambda_val,
@@ -80,6 +81,7 @@ def main(_):
           batch_size=FLAGS.batch_size,
           sample_num=FLAGS.sample_size,
           use_resize=FLAGS.use_resize,
+          replay=FLAGS.replay,
           y_dim=27,
           smoothing=FLAGS.smoothing,
           lamb = FLAGS.lambda_val,
@@ -100,6 +102,7 @@ def main(_):
           batch_size=FLAGS.batch_size,
           sample_num=FLAGS.sample_size,
           dataset_name=FLAGS.dataset,
+          replay=FLAGS.replay,
           input_fname_pattern=FLAGS.input_fname_pattern,
           use_resize=FLAGS.use_resize,
           smoothing=FLAGS.smoothing,
