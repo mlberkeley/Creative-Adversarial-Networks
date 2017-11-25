@@ -17,5 +17,7 @@ python3 main.py \
 --crop False \
 --visualize False \
 --can True \
+--use_s3 True \
+--s3_bucket mlberkeley-cans \
 --replay True \
 --train

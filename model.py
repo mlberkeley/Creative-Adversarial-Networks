@@ -83,7 +83,7 @@ class DCGAN(object):
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
     self.experience_flag = False
-    
+
     if self.dataset_name == 'mnist':
       self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
@@ -104,10 +104,10 @@ class DCGAN(object):
       else:
         self.c_dim = 1
     self.experience_buffer=[]
-    
-    
+
+
     self.grayscale = (self.c_dim == 1)
-    
+
     self.build_model()
 
   def upsample(self, input_, output_shape,
@@ -116,7 +116,7 @@ class DCGAN(object):
     if self.use_resize:
       return resizeconv(input_=input_, output_shape=output_shape,
         k_h=k_h, k_w=k_w, d_h=d_h, d_w=d_w, name=(name or "resconv"))
-   
+
     return deconv2d(input_=input_, output_shape=output_shape,
         k_h=k_h, k_w=k_w, d_h=d_h, d_w=d_w, name= (name or "deconv2d"))
 
@@ -160,9 +160,9 @@ class DCGAN(object):
         try:
           self.experience_selection = tf.convert_to_tensor(random.sample(self.experience_buffer, 16))
         except ValueError:
-          self.experience_selection = tf.convert_to_tensor(self.experience_buffer)  
+          self.experience_selection = tf.convert_to_tensor(self.experience_buffer)
         self.G = tf.concat([self.G, self.experience_selection], axis=0)
-       
+
       self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
                                                                 self.G, reuse=True)
       self.d_sum = histogram_summary("d", self.D)
@@ -173,22 +173,22 @@ class DCGAN(object):
 
       correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
       self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-      
+
       true_label = tf.random_uniform(tf.shape(self.D),.8, 1.2)
-      false_label = tf.random_uniform(tf.shape(self.D_), 0.0, 0.3) 
+      false_label = tf.random_uniform(tf.shape(self.D_), 0.0, 0.3)
 
       self.d_loss_real = tf.reduce_mean(
         sigmoid_cross_entropy_with_logits(self.D_logits, true_label * tf.ones_like(self.D)))
-      
+
       self.d_loss_fake = tf.reduce_mean(
         sigmoid_cross_entropy_with_logits(self.D_logits_, false_label * tf.ones_like(self.D_)))
-      
+
       self.d_loss_class_real = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits, labels=self.smoothing * self.y))
       self.g_loss_class_fake = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits_,
           labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
-      
+
       self.g_loss_fake = -tf.reduce_mean(tf.log(self.D_))
 
       self.d_loss = self.d_loss_real + self.d_loss_class_real + self.d_loss_fake
@@ -275,7 +275,7 @@ class DCGAN(object):
     #sample_z = n0random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
     sample_z = np.random.normal(0, 1, size=[self.sample_num, self.z_dim])
     sample_z /= np.linalg.norm(sample_z, axis=0)
-    
+
     if config.dataset == 'mnist':
       sample_inputs = self.data_X[0:self.sample_num]
       sample_labels = self.data_y[0:self.sample_num]
@@ -323,7 +323,7 @@ class DCGAN(object):
                     resize_height=self.output_height,
                     resize_width=self.output_width,
                     crop=self.crop,
-                    grayscale=self.grayscale) for sample_file in replay_files]      
+                    grayscale=self.grayscale) for sample_file in replay_files]
       print(" [*] Load SUCCESS")
     else:
       print(" [!] Load failed...")
@@ -339,7 +339,7 @@ class DCGAN(object):
 
       for idx in xrange(0, batch_idxs):
         self.experience_flag = not bool(idx % 2)
-        
+
         if config.dataset == 'mnist':
           batch_images = self.data_X[idx*config.batch_size:(idx+1)*config.batch_size]
           batch_labels = self.data_y[idx*config.batch_size:(idx+1)*config.batch_size]
@@ -358,7 +358,7 @@ class DCGAN(object):
           else:
             batch_images = np.array(batch).astype(np.float32)
           batch_labels = self.get_y(batch_files)
-          
+
         batch_z = np.random.normal(0, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
         batch_z /= np.linalg.norm(batch_z, axis=0)
@@ -452,11 +452,11 @@ class DCGAN(object):
         if np.mod(counter, 5) == 1:
           samp_images = self.G.eval({
               self.z: batch_z
-          }) 
+          })
           exp_path = os.path.join('buffer', self.model_dir)
-          max_ = get_max_end(exp_path)
+          #max_ = get_max_end(exp_path)
           for i, image in enumerate(samp_images):
-            scipy.misc.imsave(exp_path + '_' + str(max_+i) + '.jpg', np.squeeze(image))
+            #scipy.misc.imsave(exp_path + '_' + str(max_+i) + '.jpg', np.squeeze(image))
             self.experience_buffer.append(image)
 
         if np.mod(counter, 400) == 1:
@@ -488,7 +488,7 @@ class DCGAN(object):
               print("one pic error!...")
 
         if np.mod(counter, 500) == 2:
-          self.save(config.checkpoint_dir, counter)
+          self.save(config.checkpoint_dir, counter, config)
 
   def discriminator(self, image, y=None, reuse=False):
     with tf.variable_scope("discriminator") as scope:
@@ -783,7 +783,7 @@ class DCGAN(object):
         self.dataset_name, self.batch_size,
         self.output_height, self.output_width)
 
-  def save(self, checkpoint_dir, step):
+  def save(self, checkpoint_dir, step, config):
     model_name = "DCGAN.model"
     checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
 
@@ -793,6 +793,12 @@ class DCGAN(object):
     self.saver.save(self.sess,
             os.path.join(checkpoint_dir, model_name),
             global_step=step)
+
+    if config.use_s3:
+      import aws
+      s3_dir = checkpoint_dir
+      aws.upload_path(checkpoint_dir, config.s3_bucket, s3_dir)
+
 
   def load(self, checkpoint_dir):
     import re
