@@ -29,12 +29,22 @@ flags.DEFINE_boolean("crop", False, "True for training, False for testing [False
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
 flags.DEFINE_boolean("wgan", False, "True if WGAN, False if regular [G/C]AN [False]")
 flags.DEFINE_boolean("can", True, "True if CAN, False if regular GAN [True]")
+flags.DEFINE_boolean("use_s3", False, "True if you want to use s3 buckets, False if you don't. Need to set s3_bucket if True.")
+flags.DEFINE_string("s3_bucket", None, "the s3_bucket to upload results to")
 flags.DEFINE_boolean("replay", True, "True if using experience replay [True]")
 flags.DEFINE_boolean("use_resize", False, "True if resize conv for upsampling, False for fractionally strided conv [False]")
 FLAGS = flags.FLAGS
 
 def main(_):
   pp.pprint(flags.FLAGS.__flags)
+  if FLAGS.use_s3:
+    import aws
+    if FLAGS.s3_bucket is None:
+      raise ArgumentError('use_s3 flag set, but no bucket set. ')
+    # check to see if s3 bucket exists:
+    elif not aws.bucket_exists(FLAGS.s3_bucket):
+      raise ArgumentError('`use_s3` flag set, but bucket "%s" doesn\'t exist. Not using s3' % FLAGS.s3_bucket)
+
 
   if FLAGS.input_width is None:
     FLAGS.input_width = FLAGS.input_height
@@ -120,7 +130,7 @@ def main(_):
     else:
       if not dcgan.load(FLAGS.checkpoint_dir)[0]:
         raise Exception("[!] Train a model first, then run test mode")
-      
+
     OPTION = 0
     visualize(sess, dcgan, FLAGS, OPTION)
 

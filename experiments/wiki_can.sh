@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=1
+# export CUDA_VISIBLE_DEVICES=1
 python3 main.py \
 --epoch 25 \
 --learning_rate .0001 \
@@ -16,5 +16,6 @@ python3 main.py \
 --sample_dir samples \
 --crop False \
 --visualize False \
+--use_s3 \
 --can True \
---train
+--train \ 
