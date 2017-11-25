@@ -40,12 +40,10 @@ def main(_):
   if FLAGS.use_s3:
     import aws
     if FLAGS.s3_bucket is None:
-      tf.logging.warning('use_s3 flag set, but no bucket set. Not using s3')
-      FLAGS.use_s3 = False
+      raise ArgumentError('use_s3 flag set, but no bucket set. ')
     # check to see if s3 bucket exists:
     elif not aws.bucket_exists(FLAGS.s3_bucket):
-      tf.logging.warning('`use_s3` flag set, but bucket "%s" doesn\'t exist. Not using s3' % FLAGS.s3_bucket)
-      FLAGS.use_s3 = False
+      raise ArgumentError('`use_s3` flag set, but bucket "%s" doesn\'t exist. Not using s3' % FLAGS.s3_bucket)
 
 
   if FLAGS.input_width is None:
