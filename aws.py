@@ -4,9 +4,7 @@ import os
 # s3 = boto3.resource('s3')
 # s3.meta.client.upload_file('tmp/', BUCKET_NAME, 'tmp/')
 
-local_directory = 'tmp'
-bucket = 'adv-maml-models'
-destination = 'tmp'
+
 def bucket_exists(bucket):
   s3 = boto3.resource('s3')
   return s3.Bucket(bucket) in s3.buckets.all()
@@ -33,4 +31,3 @@ def upload_path(local_directory, bucket, destination):
 			except:
 				print("Uploading %s..." % s3_path)
 				client.upload_file(local_path, bucket, s3_path)
-upload_path(local_directory, bucket, destination)
