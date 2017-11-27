@@ -79,7 +79,7 @@ class DCGAN(object):
     self.wgan = wgan
     self.use_resize = use_resize
     self.replay = replay
-    
+
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
     self.experience_flag = False
@@ -151,7 +151,7 @@ class DCGAN(object):
       self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
                                                                 inputs, reuse=False)
       self.sampler            = self.sampler(self.z)
-      
+
 
 
 
@@ -503,8 +503,8 @@ class DCGAN(object):
         doesn't use y, as it tries to predict y
         """
         #Common base of convolutions
-        #h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
-        h1 = lrelu(self.d_bn1(conv2d(image, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
+        h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
+        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
         h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
         h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
         h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
