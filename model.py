@@ -260,7 +260,7 @@ class DCGAN(object):
                                                                                         self.input_height,
                                                                                         self.batch_size))
 
-    # path = "./logs/can="+str(self.can)+",lr=" + str(config.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)+"/"
+    self.log_dir = path
 
     if not glob(path + "*"):
       path = path + "000"
@@ -798,6 +798,7 @@ class DCGAN(object):
       import aws
       s3_dir = checkpoint_dir
       aws.upload_path(checkpoint_dir, config.s3_bucket, s3_dir)
+      aws.upload_path(self.log_dir, config.s3_bucket, self.log_dir, certain_upload=True)
 
 
   def load(self, checkpoint_dir):
