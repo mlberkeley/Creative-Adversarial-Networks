@@ -453,11 +453,12 @@ class DCGAN(object):
           samp_images = self.G.eval({
               self.z: batch_z
           })
-          exp_path = os.path.join('buffer', self.model_dir)
-          #max_ = get_max_end(exp_path)
-          for i, image in enumerate(samp_images):
-            #scipy.misc.imsave(exp_path + '_' + str(max_+i) + '.jpg', np.squeeze(image))
-            self.experience_buffer.append(image)
+          if self.experience_flag:
+            exp_path = os.path.join('buffer', self.model_dir)
+            #max_ = get_max_end(exp_path)
+            for i, image in enumerate(samp_images):
+              #scipy.misc.imsave(exp_path + '_' + str(max_+i) + '.jpg', np.squeeze(image))
+              self.experience_buffer.append(image)
 
         if np.mod(counter, 400) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
@@ -487,7 +488,7 @@ class DCGAN(object):
             except:
               print("one pic error!...")
 
-        if np.mod(counter, 500) == 2:
+        if np.mod(counter, config.save_itr) == 2:
           self.save(config.checkpoint_dir, counter, config)
 
   def discriminator(self, image, y=None, reuse=False):
@@ -798,6 +799,7 @@ class DCGAN(object):
       import aws
       s3_dir = checkpoint_dir
       aws.upload_path(checkpoint_dir, config.s3_bucket, s3_dir)
+      print('uploading log')
       aws.upload_path(self.log_dir, config.s3_bucket, self.log_dir, certain_upload=True)
 
 

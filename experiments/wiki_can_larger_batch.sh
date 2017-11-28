@@ -4,6 +4,7 @@ python3 main.py \
 --learning_rate .0001 \
 --beta 0.5 \
 --batch_size 35 \
+--save_itr 250 \
 --sample_size 30 \
 --input_height 256 \
 --output_height 256 \
