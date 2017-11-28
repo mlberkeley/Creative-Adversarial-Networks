@@ -453,11 +453,12 @@ class DCGAN(object):
           samp_images = self.G.eval({
               self.z: batch_z
           })
-          exp_path = os.path.join('buffer', self.model_dir)
-          #max_ = get_max_end(exp_path)
-          for i, image in enumerate(samp_images):
-            #scipy.misc.imsave(exp_path + '_' + str(max_+i) + '.jpg', np.squeeze(image))
-            self.experience_buffer.append(image)
+          if self.experience_flag:
+            exp_path = os.path.join('buffer', self.model_dir)
+            #max_ = get_max_end(exp_path)
+            for i, image in enumerate(samp_images):
+              #scipy.misc.imsave(exp_path + '_' + str(max_+i) + '.jpg', np.squeeze(image))
+              self.experience_buffer.append(image)
 
         if np.mod(counter, 400) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
