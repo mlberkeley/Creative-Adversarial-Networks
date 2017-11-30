@@ -22,7 +22,7 @@ class DCGAN(object):
          y_dim=None, z_dim=100, gf_dim=64, df_dim=32, smoothing=0.9, lamb = 1.0,
          use_resize=False, replay=True,
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False, can=True,
-         input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None):
+         input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None, old_model=False):
     """
 
     Args:
@@ -108,7 +108,7 @@ class DCGAN(object):
 
     self.grayscale = (self.c_dim == 1)
 
-    self.build_model()
+    self.build_model(old_model=old_model)
 
   def upsample(self, input_, output_shape,
         k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
@@ -120,7 +120,8 @@ class DCGAN(object):
     return deconv2d(input_=input_, output_shape=output_shape,
         k_h=k_h, k_w=k_w, d_h=d_h, d_w=d_w, name= (name or "deconv2d"))
 
-  def build_model(self):
+  def build_model(self, old_model=False):
+    print('build_model', old_model)
     if self.y_dim:
       self.y = tf.placeholder(tf.float32, [None, self.y_dim], name='y')
     else:
@@ -149,7 +150,7 @@ class DCGAN(object):
     if self.can:
       self.G                  = self.generator(self.z)
       self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
-                                                                inputs, reuse=False)
+                                                                inputs, reuse=False, old_model=old_model)
       self.sampler            = self.sampler(self.z)
 
 
@@ -164,7 +165,7 @@ class DCGAN(object):
         self.G = tf.concat([self.G, self.experience_selection], axis=0)
 
       self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
-                                                                self.G, reuse=True)
+                                                                self.G, reuse=True, old_model=old_model)
       self.d_sum = histogram_summary("d", self.D)
       self.d__sum = histogram_summary("d_", self.D_)
       self.d_c_sum = histogram_summary("d_c", self.D_c)
@@ -491,7 +492,7 @@ class DCGAN(object):
         if np.mod(counter, config.save_itr) == 2:
           self.save(config.checkpoint_dir, counter, config)
 
-  def discriminator(self, image, y=None, reuse=False):
+  def discriminator(self, image, y=None, reuse=False, old_model=False):
     with tf.variable_scope("discriminator") as scope:
       if reuse:
         scope.reuse_variables()
@@ -504,8 +505,11 @@ class DCGAN(object):
         doesn't use y, as it tries to predict y
         """
         #Common base of convolutions
-        h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
-        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
+        if old_model:
+          h1 = lrelu(self.d_bn1(conv2d(image, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
+        else:
+          h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
+          h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
         h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
         h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
         h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
