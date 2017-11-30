@@ -484,7 +484,6 @@ class DCGAN(object):
 
         if np.mod(counter, 500) == 2:
           self.save(config.checkpoint_dir, counter)
-
   def discriminator(self, image, y=None, reuse=False):
     with tf.variable_scope("discriminator") as scope:
       if reuse:
