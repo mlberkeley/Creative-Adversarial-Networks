@@ -42,6 +42,55 @@ class batch_norm(object):
                       is_training=train,
                       scope=self.name)
 
+def WGAN_loss(model):
+    model.g_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
+    model.d_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
+    
+    model.G = model.generator(model.z)
+    _, model.D_real, model.D_c, _ = model.discriminator(model.inputs, reuse=False)
+    model.sampler = model.sampler(model.z)
+    _, model.D_fake, model.D_c_, _ = model.discriminator(model.G, reuse=True)
+
+    model.correct_prediciton = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
+    self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    model.g_loss = -tf.reduce_mean(model.D_fake)
+    model.d_loss = tf.reduce_mean(model.D_fake) - tf.reduce_mean(model.D_real)
+    
+    epsilon = tf.random_uniform(
+        shape=tf.shape(model.D_real),
+        minval=0.,
+        maxval=1.
+    )
+    x_hat = model.inputs + epsilon * (model.G - model.inputs)
+    D_x_hat = model.discriminator(x_hat, reuse=True)
+    grad_D_x_hat = tf.gradients(D_x_hat, [x_hat])[0]
+    slopes = tf.sqrt(tf.reduce_sum(tf.square(grad_D_x_hat), reduction_indices=[-1]))
+    gradient_penalty = tf.reduce_mean((slopes - 1.) ** 2)
+    model.d_loss += 10 * gradient_penalty 
+
+    t_vars = tf.trainable_variables()
+    model.d_vars = [var for var in t_vars if 'd_' in var.name]
+    model.g_vars = [var for var in t_vars if 'g_' in var.name]
+    
+    g_gradvar = model.g_opt.compute_gradients(
+        model.g_loss,
+        var_list=model.g_vars,
+        colocate_gradients_with_ops=True
+    )                                          )
+    g_update = model.g_opt.apply_gradients(g_gradvar)
+    
+    d_gradvar = model.d_opt.compute_gradients(
+        model.d_loss,
+        var_list=model.d_vars,
+        colocate_gradients_with_ops=True
+    )
+    d_update = model.g_opt.apply_gradients(g_gradvar)
+    loss_ops = [model.g_loss, model.d_loss] 
+    #TODO summaries
+    return g_update, d_update, loss_ops
+
+
+
 def conv_cond_concat(x, y):
   """Concatenate conditioning vector on feature map axis."""
   x_shapes = x.get_shape()
