@@ -460,6 +460,10 @@ class DCGAN(object):
             for i, image in enumerate(samp_images):
               #scipy.misc.imsave(exp_path + '_' + str(max_+i) + '.jpg', np.squeeze(image))
               self.experience_buffer.append(image)
+            # todo make into a flag
+            exp_buffer_len = 10000
+            if len(self.experience_buffer) > exp_buffer_len:
+              self.experience_buffer = self.experience_buffer[len(self.experience_buffer) - exp_buffer_len:]
 
         if np.mod(counter, 400) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
@@ -564,6 +568,7 @@ class DCGAN(object):
         self.gf_dim = 64
 
         """
+        print(self.output_height, self.output_width)
         s_h, s_w = self.output_height, self.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -807,6 +812,21 @@ class DCGAN(object):
       aws.upload_path(self.log_dir, config.s3_bucket, self.log_dir, certain_upload=True)
 
 
+  def load_specific(self, checkpoint_dir):
+    ''' like loading but takes in a directory directly'''
+    import re
+    print(" [*] Reading checkpoints...")
+
+    ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+    if ckpt and ckpt.model_checkpoint_path:
+      ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+      self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
+      counter = int(next(re.finditer("(\d+)(?!.*\d)",ckpt_name)).group(0))
+      print(" [*] Success to read {}".format(ckpt_name))
+      return True, counter
+    else:
+      print(" [*] Failed to find a checkpoint")
+      return False, 0
   def load(self, checkpoint_dir):
     import re
     print(" [*] Reading checkpoints...")
