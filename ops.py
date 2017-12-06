@@ -26,6 +26,12 @@ else:
   def concat(tensors, axis, *args, **kwargs):
     return tf.concat(tensors, axis, *args, **kwargs)
 
+def sigmoid_cross_entropy_with_logits(x, y):
+      try:
+        return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
+      except:
+        return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
+
 class batch_norm(object):
   def __init__(self, epsilon=1e-5, momentum = 0.9, name="batch_norm"):
     with tf.variable_scope(name):
@@ -41,17 +47,118 @@ class batch_norm(object):
                       scale=True,
                       is_training=train,
                       scope=self.name)
+def CAN_loss(model, config):
+    #builds optimizers and losses
+    model.G                  = model.generator(model.z)
+    model.D, model.D_logits, model.D_c, model.D_c_logits     = model.discriminator(
+                                                              inputs, reuse=False)
+    if model.experience_flag:
+      try:
+        model.experience_selection = tf.convert_to_tensor(random.sample(model.experience_buffer, 16))
+      except ValueError:
+        model.experience_selection = tf.convert_to_tensor(model.experience_buffer)
+      model.G = tf.concat([model.G, model.experience_selection], axis=0)
 
-def WGAN_loss(model):
-    model.g_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
-    model.d_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
+    model.D_, model.D_logits_, model.D_c_, model.D_c_logits_ = model.discriminator(
+                                                              model.G, reuse=True)
+    model.d_sum = histogram_summary("d", model.D)
+    model.d__sum = histogram_summary("d_", model.D_)
+    model.d_c_sum = histogram_summary("d_c", model.D_c)
+    model.d_c__sum = histogram_summary("d_c_", model.D_c_)
+    model.G_sum = image_summary("G", model.G)
+
+    correct_prediction = tf.equal(tf.argmax(model.y,1), tf.argmax(model.D_c,1))
+    model.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+    true_label = tf.random_uniform(tf.shape(model.D),.8, 1.2)
+    false_label = tf.random_uniform(tf.shape(model.D_), 0.0, 0.3)
+
+    model.d_loss_real = tf.reduce_mean(
+      sigmoid_cross_entropy_with_logits(model.D_logits, true_label * tf.ones_like(model.D)))
+
+    model.d_loss_fake = tf.reduce_mean(
+      sigmoid_cross_entropy_with_logits(model.D_logits_, false_label * tf.ones_like(model.D_)))
+
+    model.d_loss_class_real = tf.reduce_mean(
+      tf.nn.softmax_cross_entropy_with_logits(logits=model.D_c_logits, labels=model.smoothing * model.y))
+    model.g_loss_class_fake = tf.reduce_mean(
+      tf.nn.softmax_cross_entropy_with_logits(logits=model.D_c_logits_,
+        labels=(1.0/model.y_dim)*tf.ones_like(model.D_c_)))
+
+    model.g_loss_fake = -tf.reduce_mean(tf.log(model.D_))
+
+    model.d_loss = model.d_loss_real + model.d_loss_class_real + model.d_loss_fake
+    model.g_loss = model.g_loss_fake + model.lamb * model.g_loss_class_fake
+
+    model.d_loss_real_sum       = scalar_summary("d_loss_real", model.d_loss_real)
+    model.d_loss_fake_sum       = scalar_summary("d_loss_fake", model.d_loss_fake)
+    model.d_loss_class_real_sum = scalar_summary("d_loss_class_real", model.d_loss_class_real)
+    model.g_loss_class_fake_sum = scalar_summary("g_loss_class_fake", model.g_loss_class_fake)
+    model.g_loss_sum = scalar_summary("g_loss", model.g_loss)
+    model.d_loss_sum = scalar_summary("d_loss", model.d_loss)
+    model.d_sum = merge_summary(
+        [model.z_sum, model.d_sum, model.d_loss_real_sum, model.d_loss_sum, 
+        model.d_loss_class_real_sum, model.g_loss_class_fake_sum])
+    model.g_sum = merge_summary([model.z_sum, model.d__sum,
+      model.G_sum, model.d_loss_fake_sum, model.g_loss_sum])
+    
+    model.g_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
+    model.d_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
+    d_update = model.d_opt.minimize(model.d_loss, var_list=model.d_vars)    
+    g_update = model.g_opt.minimize(model.g_loss, var_list=model.g_vars)
+    
+    return d_update, g_update, [model.d_loss, model.g_loss], [model.d_sum, model.g_sum]
+
+def WCAN_loss(model, config):
+    pass    
+
+
+def GAN_loss(model, config):
+    #builds loss and optimizers for standard GAN loss.
+    
+    model.G                  = model.generator(model.z, model.y)
+    model.D, model.D_logits   = model.discriminator(inputs, model.y, reuse=False)
+    model.sampler            = model.sampler(model.z, model.y)
+    model.D_, model.D_logits_ = model.discriminator(model.G, model.y, reuse=True)
+
+    true_label = tf.random_uniform(tf.shape(model.D),.8, 1.2)
+    false_label = tf.random_uniform(tf.shape(model.D_), 0.0, 0.3) 
+
+    model.d_loss_real = tf.reduce_mean(
+      sigmoid_cross_entropy_with_logits(model.D_logits, true_label * tf.ones_like(model.D)))
+    model.d_loss_fake = tf.reduce_mean(
+      sigmoid_cross_entropy_with_logits(model.D_logits_, fale_label * tf.ones_like(model.D_)))
+    
+    model.g_loss = tf.reduce_mean(
+      sigmoid_cross_entropy_with_logits(model.D_logits_, tf.ones_like(model.D_)))
+    model.d_loss = model.d_loss_real + model.d_loss_fake
+    
+    model.d_sum = histogram_summary("d", model.D)
+    model.d__sum = histogram_summary("d_", model.D_)
+    model.G_sum = image_summary("G", model.G)
+
+    model.d_sum = merge_summary(
+      [model.z_sum, model.d_sum, model.d_loss_real_sum, model.d_loss_sum])
+    model.g_sum = merge_summary([model.z_sum, model.d__sum,
+      model.G_sum, model.d_loss_fake_sum, model.g_loss_sum])
+    
+    model.g_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
+    model.d_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
+    d_update = model.d_opt.minimize(model.d_loss, var_list=model.d_vars)    
+    g_update = model.g_opt.minimize(model.g_loss, var_list=model.g_vars)
+ 
+    return d_update, g_update, [model.d_loss, model.g_loss], [model.d_sum, model.g_sum] 
+
+def WGAN_loss(model, config):
+    model.g_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
+    model.d_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
     
     model.G = model.generator(model.z)
     _, model.D_real, model.D_c, _ = model.discriminator(model.inputs, reuse=False)
     model.sampler = model.sampler(model.z)
     _, model.D_fake, model.D_c_, _ = model.discriminator(model.G, reuse=True)
 
-    model.correct_prediciton = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
+    model.correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
     self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     model.g_loss = -tf.reduce_mean(model.D_fake)
     model.d_loss = tf.reduce_mean(model.D_fake) - tf.reduce_mean(model.D_real)
@@ -76,7 +183,7 @@ def WGAN_loss(model):
         model.g_loss,
         var_list=model.g_vars,
         colocate_gradients_with_ops=True
-    )                                          )
+    )
     g_update = model.g_opt.apply_gradients(g_gradvar)
     
     d_gradvar = model.d_opt.compute_gradients(
@@ -85,9 +192,9 @@ def WGAN_loss(model):
         colocate_gradients_with_ops=True
     )
     d_update = model.g_opt.apply_gradients(g_gradvar)
-    loss_ops = [model.g_loss, model.d_loss] 
+    loss_ops = [model.d_loss, model.g_loss] 
     #TODO summaries
-    return g_update, d_update, loss_ops
+    return d_update, g_update, loss_ops, None
 
 
 
@@ -128,6 +235,7 @@ def resizeconv(input_, output_shape,
     biases = tf.get_variable('biases', output_shape[-1], initializer=tf.constant_initializer(0.0))
     
     return tf.nn.bias_add(resconv, biases)
+
 def deconv2d(input_, output_shape,
        k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
        name="deconv2d"):

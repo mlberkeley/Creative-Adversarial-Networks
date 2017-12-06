@@ -104,8 +104,6 @@ class DCGAN(object):
       else:
         self.c_dim = 1
     self.experience_buffer=[]
-    
-    
     self.grayscale = (self.c_dim == 1)
     
     self.build_model()
@@ -133,93 +131,14 @@ class DCGAN(object):
 
     self.inputs = tf.placeholder(
       tf.float32, [None] + image_dims, name='real_images')
-
-    inputs = self.inputs
-
     self.z = tf.placeholder(
       tf.float32, [None, self.z_dim], name='z')
     self.z_sum = histogram_summary("z", self.z)
 
-    def sigmoid_cross_entropy_with_logits(x, y):
-      try:
-        return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
-      except:
-        return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
-
     if self.can:
-      self.G                  = self.generator(self.z)
-      self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
-                                                                inputs, reuse=False)
       self.sampler            = self.sampler(self.z)
-      if self.experience_flag:
-        try:
-          self.experience_selection = tf.convert_to_tensor(random.sample(self.experience_buffer, 16))
-        except ValueError:
-          self.experience_selection = tf.convert_to_tensor(self.experience_buffer)  
-        self.G = tf.concat([self.G, self.experience_selection], axis=0)
-      
-      self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
-                                                                self.G, reuse=True)
-      self.d_sum = histogram_summary("d", self.D)
-      self.d__sum = histogram_summary("d_", self.D_)
-      self.d_c_sum = histogram_summary("d_c", self.D_c)
-      self.d_c__sum = histogram_summary("d_c_", self.D_c_)
-      self.G_sum = image_summary("G", self.G)
-
-      correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
-      self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-      
-      true_label = tf.random_uniform(tf.shape(self.D),.8, 1.2)
-      false_label = tf.random_uniform(tf.shape(self.D_), 0.0, 0.3) 
-
-      self.d_loss_real = tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits, true_label * tf.ones_like(self.D)))
-      
-      self.d_loss_fake = tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits_, false_label * tf.ones_like(self.D_)))
-      
-      self.d_loss_class_real = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits, labels=self.smoothing * self.y))
-      self.g_loss_class_fake = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits_,
-          labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
-      
-      self.g_loss_fake = -tf.reduce_mean(tf.log(self.D_))
-
-      self.d_loss = self.d_loss_real + self.d_loss_class_real + self.d_loss_fake
-      self.g_loss = self.g_loss_fake + self.lamb * self.g_loss_class_fake
-
-      self.d_loss_real_sum       = scalar_summary("d_loss_real", self.d_loss_real)
-      self.d_loss_fake_sum       = scalar_summary("d_loss_fake", self.d_loss_fake)
-      self.d_loss_class_real_sum = scalar_summary("d_loss_class_real", self.d_loss_class_real)
-      self.g_loss_class_fake_sum = scalar_summary("g_loss_class_fake", self.g_loss_class_fake)
-
-
     else:
-      self.G                  = self.generator(self.z, self.y)
-      self.D, self.D_logits   = self.discriminator(inputs, self.y, reuse=False)
       self.sampler            = self.sampler(self.z, self.y)
-      self.D_, self.D_logits_ = self.discriminator(self.G, self.y, reuse=True)
-
-      self.d_sum = histogram_summary("d", self.D)
-      self.d__sum = histogram_summary("d_", self.D_)
-      self.G_sum = image_summary("G", self.G)
-
-      self.d_loss_real = tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits, self.smoothing * tf.ones_like(self.D)))
-      self.d_loss_fake = tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits_, tf.zeros_like(self.D_)))
-      self.g_loss = tf.reduce_mean(
-        sigmoid_cross_entropy_with_logits(self.D_logits_, tf.ones_like(self.D_)))
-
-      self.d_loss_real_sum = scalar_summary("d_loss_real", self.d_loss_real)
-      self.d_loss_fake_sum = scalar_summary("d_loss_fake", self.d_loss_fake)
-
-      self.d_loss = self.d_loss_real + self.d_loss_fake
-
-    self.g_loss_sum = scalar_summary("g_loss", self.g_loss)
-    self.d_loss_sum = scalar_summary("d_loss", self.d_loss)
-
     t_vars = tf.trainable_variables()
 
     self.d_vars = [var for var in t_vars if 'd_' in var.name]
@@ -228,34 +147,27 @@ class DCGAN(object):
     self.saver = tf.train.Saver()
 
   def train(self, config):
-    d_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
-              .minimize(self.d_loss, var_list=self.d_vars)
-    g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
-              .minimize(self.g_loss, var_list=self.g_vars)
+    if self.wgan and not self.can:
+        d_update, g_update, losses, sums = WGAN_loss(self, config)
+    if self.wgan and self.can:
+        d_update, g_update, losses, sums = WCAN_loss(self, config)
+    if not self.wgan and self.can:
+        d_update, g_update, losses, sums = CAN_loss(self, config)
+    elif not self.wgan and not self.can:
+        d_update, g_update, losses, sums = GAN_loss(self, config)
+    #self.{g,d}_opt are created in the loss functions.
+
+    
     try:
       tf.global_variables_initializer().run()
     except:
       tf.initialize_all_variables().run()
-
-    self.g_sum = merge_summary([self.z_sum, self.d__sum,
-      self.G_sum, self.d_loss_fake_sum, self.g_loss_sum])
-
-    if self.can:
-      self.d_sum = merge_summary(
-        [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum, self.d_loss_class_real_sum, self.g_loss_class_fake_sum])
-
-    else:
-      self.d_sum = merge_summary(
-        [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
-
 
     path = os.path.join('logs', "dataset={},isCan={},lr={},imsize={},batch_size={}".format(config.dataset,
                                                                                         self.can,
                                                                                         config.learning_rate,
                                                                                         self.input_height,
                                                                                         self.batch_size))
-
-    # path = "./logs/can="+str(self.can)+",lr=" + str(config.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)+"/"
 
     if not glob(path + "*"):
       path = path + "000"
@@ -360,7 +272,8 @@ class DCGAN(object):
 
         if self.can:
         #update D
-          _, summary_str = self.sess.run([d_optim, self.d_sum],
+        
+          _, summary_str = self.sess.run([d_update, sums[0]],
             feed_dict={
               self.inputs: batch_images,
               self.z: batch_z,
@@ -368,7 +281,7 @@ class DCGAN(object):
             })
           self.writer.add_summary(summary_str,counter)
         #Update G: don't need labels or inputs
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
+          _, summary_str = self.sess.run([g_update, sums[1]],
             feed_dict={
               self.z: batch_z,
             })
@@ -444,14 +357,11 @@ class DCGAN(object):
           print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD_fake+errD_real, errG))
-        if np.mod(counter, 5) == 1:
+        if np.mod(counter, 64) == 1:
           samp_images = self.G.eval({
               self.z: batch_z
-          }) 
-          exp_path = os.path.join('buffer', self.model_dir)
-          max_ = get_max_end(exp_path)
-          for i, image in enumerate(samp_images):
-            scipy.misc.imsave(exp_path + '_' + str(max_+i) + '.jpg', np.squeeze(image))
+          })       
+          for image in enumerate(samp_images):
             self.experience_buffer.append(image)
 
         if np.mod(counter, 400) == 1:
