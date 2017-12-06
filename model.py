@@ -2,6 +2,7 @@ from __future__ import division
 import os
 import time
 import math
+import random
 from glob import glob
 import tensorflow as tf
 import numpy as np
@@ -19,9 +20,9 @@ class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=32, smoothing=0.9, lamb = 1.0,
-         use_resize=False,
+         use_resize=False, replay=True,
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False, can=True,
-         input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None):
+         input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None, old_model=False):
     """
 
     Args:
@@ -77,10 +78,11 @@ class DCGAN(object):
     self.can = can
     self.wgan = wgan
     self.use_resize = use_resize
-    #if we do implement wGAN+CAN
+    self.replay = replay
 
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
+    self.experience_flag = False
 
     if self.dataset_name == 'mnist':
       self.data_X, self.data_y = self.load_mnist()
@@ -101,10 +103,12 @@ class DCGAN(object):
         self.c_dim = imread(self.data[0]).shape[-1]
       else:
         self.c_dim = 1
+    self.experience_buffer=[]
+
 
     self.grayscale = (self.c_dim == 1)
 
-    self.build_model()
+    self.build_model(old_model=old_model)
 
   def upsample(self, input_, output_shape,
         k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
@@ -112,11 +116,12 @@ class DCGAN(object):
     if self.use_resize:
       return resizeconv(input_=input_, output_shape=output_shape,
         k_h=k_h, k_w=k_w, d_h=d_h, d_w=d_w, name=(name or "resconv"))
-   
+
     return deconv2d(input_=input_, output_shape=output_shape,
         k_h=k_h, k_w=k_w, d_h=d_h, d_w=d_w, name= (name or "deconv2d"))
 
-  def build_model(self):
+  def build_model(self, old_model=False):
+    print('build_model', old_model)
     if self.y_dim:
       self.y = tf.placeholder(tf.float32, [None, self.y_dim], name='y')
     else:
@@ -145,11 +150,22 @@ class DCGAN(object):
     if self.can:
       self.G                  = self.generator(self.z)
       self.D, self.D_logits, self.D_c, self.D_c_logits     = self.discriminator(
-                                                                inputs, reuse=False)
+                                                                inputs, reuse=False, old_model=old_model)
       self.sampler            = self.sampler(self.z)
-      self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
-                                                                self.G, reuse=True)
 
+
+
+
+
+      if self.experience_flag:
+        try:
+          self.experience_selection = tf.convert_to_tensor(random.sample(self.experience_buffer, 16))
+        except ValueError:
+          self.experience_selection = tf.convert_to_tensor(self.experience_buffer)
+        self.G = tf.concat([self.G, self.experience_selection], axis=0)
+
+      self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
+                                                                self.G, reuse=True, old_model=old_model)
       self.d_sum = histogram_summary("d", self.D)
       self.d__sum = histogram_summary("d_", self.D_)
       self.d_c_sum = histogram_summary("d_c", self.D_c)
@@ -158,22 +174,22 @@ class DCGAN(object):
 
       correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
       self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-      
+
       true_label = tf.random_uniform(tf.shape(self.D),.8, 1.2)
-      false_label = tf.random_uniform(tf.shape(self.D_), 0.0, 0.3) 
+      false_label = tf.random_uniform(tf.shape(self.D_), 0.0, 0.3)
 
       self.d_loss_real = tf.reduce_mean(
         sigmoid_cross_entropy_with_logits(self.D_logits, true_label * tf.ones_like(self.D)))
-      
+
       self.d_loss_fake = tf.reduce_mean(
         sigmoid_cross_entropy_with_logits(self.D_logits_, false_label * tf.ones_like(self.D_)))
-      
+
       self.d_loss_class_real = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits, labels=self.smoothing * self.y))
       self.g_loss_class_fake = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits_,
           labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
-      
+
       self.g_loss_fake = -tf.reduce_mean(tf.log(self.D_))
 
       self.d_loss = self.d_loss_real + self.d_loss_class_real + self.d_loss_fake
@@ -245,7 +261,7 @@ class DCGAN(object):
                                                                                         self.input_height,
                                                                                         self.batch_size))
 
-    # path = "./logs/can="+str(self.can)+",lr=" + str(config.learning_rate)+",imsize="+str(self.input_height)+",batch_size="+str(self.batch_size)+"/"
+    self.log_dir = path
 
     if not glob(path + "*"):
       path = path + "000"
@@ -260,7 +276,7 @@ class DCGAN(object):
     #sample_z = n0random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
     sample_z = np.random.normal(0, 1, size=[self.sample_num, self.z_dim])
     sample_z /= np.linalg.norm(sample_z, axis=0)
-    
+
     if config.dataset == 'mnist':
       sample_inputs = self.data_X[0:self.sample_num]
       sample_labels = self.data_y[0:self.sample_num]
@@ -300,6 +316,15 @@ class DCGAN(object):
     could_load, checkpoint_counter = self.load(self.checkpoint_dir)
     if could_load:
       counter = checkpoint_counter
+      replay_files = glob(os.path.join(self.model_dir + '_replay'))
+      self.experience_buffer =[
+                    get_image(sample_file,
+                    input_height=self.input_height,
+                    input_width=self.input_width,
+                    resize_height=self.output_height,
+                    resize_width=self.output_width,
+                    crop=self.crop,
+                    grayscale=self.grayscale) for sample_file in replay_files]
       print(" [*] Load SUCCESS")
     else:
       print(" [!] Load failed...")
@@ -314,6 +339,8 @@ class DCGAN(object):
         batch_idxs = min(len(self.data), config.train_size) // config.batch_size
 
       for idx in xrange(0, batch_idxs):
+        self.experience_flag = not bool(idx % 2)
+
         if config.dataset == 'mnist':
           batch_images = self.data_X[idx*config.batch_size:(idx+1)*config.batch_size]
           batch_labels = self.data_y[idx*config.batch_size:(idx+1)*config.batch_size]
@@ -423,8 +450,22 @@ class DCGAN(object):
           print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD_fake+errD_real, errG))
+        if np.mod(counter, 5) == 1:
+          samp_images = self.G.eval({
+              self.z: batch_z
+          })
+          if self.experience_flag:
+            exp_path = os.path.join('buffer', self.model_dir)
+            #max_ = get_max_end(exp_path)
+            for i, image in enumerate(samp_images):
+              #scipy.misc.imsave(exp_path + '_' + str(max_+i) + '.jpg', np.squeeze(image))
+              self.experience_buffer.append(image)
+            # todo make into a flag
+            exp_buffer_len = 10000
+            if len(self.experience_buffer) > exp_buffer_len:
+              self.experience_buffer = self.experience_buffer[len(self.experience_buffer) - exp_buffer_len:]
 
-        if np.mod(counter,400) == 1:
+        if np.mod(counter, 400) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
             samples, d_loss, g_loss = self.sess.run(
               [self.sampler, self.d_loss, self.g_loss],
@@ -452,10 +493,10 @@ class DCGAN(object):
             except:
               print("one pic error!...")
 
-        if np.mod(counter, 500) == 2:
-          self.save(config.checkpoint_dir, counter)
+        if np.mod(counter, config.save_itr) == 2:
+          self.save(config.checkpoint_dir, counter, config)
 
-  def discriminator(self, image, y=None, reuse=False):
+  def discriminator(self, image, y=None, reuse=False, old_model=False):
     with tf.variable_scope("discriminator") as scope:
       if reuse:
         scope.reuse_variables()
@@ -468,8 +509,11 @@ class DCGAN(object):
         doesn't use y, as it tries to predict y
         """
         #Common base of convolutions
-        #h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
-        h1 = lrelu(self.d_bn1(conv2d(image, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
+        if old_model:
+          h1 = lrelu(self.d_bn1(conv2d(image, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
+        else:
+          h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
+          h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
         h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
         h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
         h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
@@ -524,6 +568,7 @@ class DCGAN(object):
         self.gf_dim = 64
 
         """
+        print(self.output_height, self.output_width)
         s_h, s_w = self.output_height, self.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -531,8 +576,7 @@ class DCGAN(object):
         s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
         s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
         s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
-        # project `z` and reshape
-        # for full experiment, this and the next line were s_(hw)64*16*gfdim
+
         z_ = linear(
             z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 
@@ -636,7 +680,6 @@ class DCGAN(object):
         h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
         h0 = lrelu(self.g_bn0(h0, train=False))
 
-        #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
 
         h1 = self.upsample(h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
         h1 = lrelu(self.g_bn1(h1, train=False))
@@ -750,7 +793,7 @@ class DCGAN(object):
         self.dataset_name, self.batch_size,
         self.output_height, self.output_width)
 
-  def save(self, checkpoint_dir, step):
+  def save(self, checkpoint_dir, step, config):
     model_name = "DCGAN.model"
     checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
 
@@ -761,6 +804,29 @@ class DCGAN(object):
             os.path.join(checkpoint_dir, model_name),
             global_step=step)
 
+    if config.use_s3:
+      import aws
+      s3_dir = checkpoint_dir
+      aws.upload_path(checkpoint_dir, config.s3_bucket, s3_dir)
+      print('uploading log')
+      aws.upload_path(self.log_dir, config.s3_bucket, self.log_dir, certain_upload=True)
+
+
+  def load_specific(self, checkpoint_dir):
+    ''' like loading but takes in a directory directly'''
+    import re
+    print(" [*] Reading checkpoints...")
+
+    ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+    if ckpt and ckpt.model_checkpoint_path:
+      ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+      self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
+      counter = int(next(re.finditer("(\d+)(?!.*\d)",ckpt_name)).group(0))
+      print(" [*] Success to read {}".format(ckpt_name))
+      return True, counter
+    else:
+      print(" [*] Failed to find a checkpoint")
+      return False, 0
   def load(self, checkpoint_dir):
     import re
     print(" [*] Reading checkpoints...")

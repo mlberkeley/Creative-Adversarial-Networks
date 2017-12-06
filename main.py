@@ -14,6 +14,7 @@ flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
 flags.DEFINE_float("smoothing", 0.9, "Smoothing term for discriminator real (class) loss [0.9]")
 flags.DEFINE_float("lambda_val", 1.0, "determines the relative importance of style ambiguity loss [1.0]")
 flags.DEFINE_integer("train_size", np.inf, "The size of train images [np.inf]")
+flags.DEFINE_integer("save_itr", 500, "The number of iterations to run for saving checkpoints")
 flags.DEFINE_integer("batch_size", 64, "The size of batch images [64]")
 flags.DEFINE_integer("sample_size", 64, "the size of sample images [64]")
 flags.DEFINE_integer("input_height", 108, "The size of image to use (will be center cropped). [108]")
@@ -29,11 +30,22 @@ flags.DEFINE_boolean("crop", False, "True for training, False for testing [False
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
 flags.DEFINE_boolean("wgan", False, "True if WGAN, False if regular [G/C]AN [False]")
 flags.DEFINE_boolean("can", True, "True if CAN, False if regular GAN [True]")
+flags.DEFINE_boolean("use_s3", False, "True if you want to use s3 buckets, False if you don't. Need to set s3_bucket if True.")
+flags.DEFINE_string("s3_bucket", None, "the s3_bucket to upload results to")
+flags.DEFINE_boolean("replay", True, "True if using experience replay [True]")
 flags.DEFINE_boolean("use_resize", False, "True if resize conv for upsampling, False for fractionally strided conv [False]")
 FLAGS = flags.FLAGS
 
 def main(_):
   pp.pprint(flags.FLAGS.__flags)
+  if FLAGS.use_s3:
+    import aws
+    if FLAGS.s3_bucket is None:
+      raise ArgumentError('use_s3 flag set, but no bucket set. ')
+    # check to see if s3 bucket exists:
+    elif not aws.bucket_exists(FLAGS.s3_bucket):
+      raise ArgumentError('`use_s3` flag set, but bucket "%s" doesn\'t exist. Not using s3' % FLAGS.s3_bucket)
+
 
   if FLAGS.input_width is None:
     FLAGS.input_width = FLAGS.input_height
@@ -45,7 +57,6 @@ def main(_):
   if not os.path.exists(FLAGS.sample_dir):
     os.makedirs(FLAGS.sample_dir)
 
-  #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.333)
   run_config = tf.ConfigProto()
   run_config.gpu_options.allow_growth=True
 
@@ -60,6 +71,7 @@ def main(_):
           batch_size=FLAGS.batch_size,
           sample_num=FLAGS.sample_size,
           use_resize=FLAGS.use_resize,
+          replay=FLAGS.replay,
           y_dim=10,
           smoothing=FLAGS.smoothing,
           lamb = FLAGS.lambda_val,
@@ -80,6 +92,7 @@ def main(_):
           batch_size=FLAGS.batch_size,
           sample_num=FLAGS.sample_size,
           use_resize=FLAGS.use_resize,
+          replay=FLAGS.replay,
           y_dim=27,
           smoothing=FLAGS.smoothing,
           lamb = FLAGS.lambda_val,
@@ -100,6 +113,7 @@ def main(_):
           batch_size=FLAGS.batch_size,
           sample_num=FLAGS.sample_size,
           dataset_name=FLAGS.dataset,
+          replay=FLAGS.replay,
           input_fname_pattern=FLAGS.input_fname_pattern,
           use_resize=FLAGS.use_resize,
           smoothing=FLAGS.smoothing,
@@ -117,7 +131,7 @@ def main(_):
     else:
       if not dcgan.load(FLAGS.checkpoint_dir)[0]:
         raise Exception("[!] Train a model first, then run test mode")
-      
+
     OPTION = 0
     visualize(sess, dcgan, FLAGS, OPTION)
 
