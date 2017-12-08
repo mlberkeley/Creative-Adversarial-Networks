@@ -3,7 +3,7 @@ python3 main.py \
 --epoch 25 \
 --learning_rate .0001 \
 --beta 0.5 \
---batch_size 33 \
+--batch_size 29 \
 --sample_size 64 \
 --input_height 64 \
 --output_height 64 \
@@ -16,6 +16,6 @@ python3 main.py \
 --sample_dir samples \
 --crop False \
 --visualize False \
---can True \
+--can False \
 --wgan False \
 --train

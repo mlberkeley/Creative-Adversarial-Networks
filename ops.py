@@ -123,7 +123,6 @@ def GAN_loss(model):
     
     model.G                  = model.generator(model.z, model.y)
     model.D, model.D_logits   = model.discriminator(model.inputs, model.y, reuse=False)
-    model.sampler            = model.sampler(model.z, model.y)
     model.D_, model.D_logits_ = model.discriminator(model.G, model.y, reuse=True)
 
     true_label = tf.random_uniform(tf.shape(model.D),.8, 1.2)
@@ -132,7 +131,7 @@ def GAN_loss(model):
     model.d_loss_real = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(model.D_logits, true_label * tf.ones_like(model.D)))
     model.d_loss_fake = tf.reduce_mean(
-      sigmoid_cross_entropy_with_logits(model.D_logits_, fale_label * tf.ones_like(model.D_)))
+            sigmoid_cross_entropy_with_logits(model.D_logits_, false_label * tf.ones_like(model.D_)))
     
     model.g_loss = tf.reduce_mean(
       sigmoid_cross_entropy_with_logits(model.D_logits_, tf.ones_like(model.D_)))
@@ -142,6 +141,10 @@ def GAN_loss(model):
     model.d__sum = histogram_summary("d_", model.D_)
     model.G_sum = image_summary("G", model.G)
 
+    model.g_loss_sum = scalar_summary("g_loss", model.g_loss)
+    model.d_loss_sum = scalar_summary("d_loss", model.d_loss)
+    model.d_loss_real_sum = scalar_summary("d_loss_real", model.d_loss_real)
+    model.d_loss_fake_sum = scalar_summary("d_loss_fake", model.d_loss_fake)
     model.d_sum = merge_summary(
       [model.z_sum, model.d_sum, model.d_loss_real_sum, model.d_loss_sum])
     model.g_sum = merge_summary([model.z_sum, model.d__sum,
@@ -152,8 +155,8 @@ def GAN_loss(model):
     t_vars = tf.trainable_variables()
     d_vars = [var for var in t_vars if 'd_' in var.name]
     g_vars = [var for var in t_vars if 'g_' in var.name]
-    d_update = model.d_opt.minimize(model.d_loss, var_list=model.d_vars)    
-    g_update = model.g_opt.minimize(model.g_loss, var_list=model.g_vars)
+    d_update = model.d_opt.minimize(model.d_loss, var_list=d_vars)    
+    g_update = model.g_opt.minimize(model.g_loss, var_list=g_vars)
  
     return d_update, g_update, [model.d_loss, model.g_loss], [model.d_sum, model.g_sum] 
 
@@ -208,8 +211,8 @@ def WGAN_loss(model):
 
 def conv_cond_concat(x, y):
   """Concatenate conditioning vector on feature map axis."""
-  x_shapes = x.get_shape()
-  y_shapes = y.get_shape()
+  x_shapes = tf.shape(x)
+  y_shapes = tf.shape(y)
   return concat([
     x, y*tf.ones([x_shapes[0], x_shapes[1], x_shapes[2], y_shapes[3]])], 3)
 

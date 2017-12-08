@@ -313,7 +313,7 @@ class DCGAN(object):
           })
         else:
           # Update D network
-          _, summary_str = self.sess.run([self.d_optim, self.d_sum],
+          _, summary_str = self.sess.run([self.d_update, self.d_sum],
             feed_dict={
               self.inputs: batch_images,
               self.z: batch_z,
@@ -322,7 +322,7 @@ class DCGAN(object):
           self.writer.add_summary(summary_str, counter)
 
           # Update G network
-          _, summary_str = self.sess.run([self.g_optim, self.g_sum],
+          _, summary_str = self.sess.run([self.g_update, self.g_sum],
             feed_dict={
               self.z: batch_z,
               self.y: batch_labels,
@@ -330,10 +330,6 @@ class DCGAN(object):
           self.writer.add_summary(summary_str, counter)
 
           # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
-            feed_dict={ self.z: batch_z, self.y:batch_labels })
-          self.writer.add_summary(summary_str, counter)
-
           errD_fake = self.d_loss_fake.eval({
               self.z: batch_z,
               self.y:batch_labels
@@ -443,7 +439,7 @@ class DCGAN(object):
         h5 = tf.reshape(h5, [-1, shape])
         h5 = concat([h5,y],1)
 
-        r_out = linear(tf.reshape(h5, [self.batch_size, -1]), 1, 'd_ro_lin')
+        r_out = linear(h5, 1, 'd_ro_lin')
         return tf.nn.sigmoid(r_out), r_out
   def generator(self, z, y=None):
     with tf.variable_scope("generator") as scope:
