@@ -47,11 +47,11 @@ class batch_norm(object):
                       scale=True,
                       is_training=train,
                       scope=self.name)
-def CAN_loss(model, config):
+def CAN_loss(model):
     #builds optimizers and losses
     model.G                  = model.generator(model.z)
     model.D, model.D_logits, model.D_c, model.D_c_logits     = model.discriminator(
-                                                              inputs, reuse=False)
+                                                              model.inputs, reuse=False)
     if model.experience_flag:
       try:
         model.experience_selection = tf.convert_to_tensor(random.sample(model.experience_buffer, 16))
@@ -102,22 +102,27 @@ def CAN_loss(model, config):
     model.g_sum = merge_summary([model.z_sum, model.d__sum,
       model.G_sum, model.d_loss_fake_sum, model.g_loss_sum])
     
-    model.g_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
-    model.d_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
-    d_update = model.d_opt.minimize(model.d_loss, var_list=model.d_vars)    
-    g_update = model.g_opt.minimize(model.g_loss, var_list=model.g_vars)
+    model.g_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
+    model.d_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
+
+    t_vars = tf.trainable_variables()
+    d_vars = [var for var in t_vars if 'd_' in var.name]
+    g_vars = [var for var in t_vars if 'g_' in var.name]
+
+    d_update = model.d_opt.minimize(model.d_loss, var_list=d_vars)    
+    g_update = model.g_opt.minimize(model.g_loss, var_list=g_vars)
     
     return d_update, g_update, [model.d_loss, model.g_loss], [model.d_sum, model.g_sum]
 
-def WCAN_loss(model, config):
+def WCAN_loss(model):
     pass    
 
 
-def GAN_loss(model, config):
+def GAN_loss(model):
     #builds loss and optimizers for standard GAN loss.
     
     model.G                  = model.generator(model.z, model.y)
-    model.D, model.D_logits   = model.discriminator(inputs, model.y, reuse=False)
+    model.D, model.D_logits   = model.discriminator(model.inputs, model.y, reuse=False)
     model.sampler            = model.sampler(model.z, model.y)
     model.D_, model.D_logits_ = model.discriminator(model.G, model.y, reuse=True)
 
@@ -142,16 +147,19 @@ def GAN_loss(model, config):
     model.g_sum = merge_summary([model.z_sum, model.d__sum,
       model.G_sum, model.d_loss_fake_sum, model.g_loss_sum])
     
-    model.g_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
-    model.d_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
+    model.g_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
+    model.d_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
+    t_vars = tf.trainable_variables()
+    d_vars = [var for var in t_vars if 'd_' in var.name]
+    g_vars = [var for var in t_vars if 'g_' in var.name]
     d_update = model.d_opt.minimize(model.d_loss, var_list=model.d_vars)    
     g_update = model.g_opt.minimize(model.g_loss, var_list=model.g_vars)
  
     return d_update, g_update, [model.d_loss, model.g_loss], [model.d_sum, model.g_sum] 
 
-def WGAN_loss(model, config):
-    model.g_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
-    model.d_opt = tf.train.AdamOptimizer(learning_rate=config.learning_rate, beta1=0.5)
+def WGAN_loss(model):
+    model.g_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
+    model.d_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
     
     model.G = model.generator(model.z)
     _, model.D_real, model.D_c, _ = model.discriminator(model.inputs, reuse=False)

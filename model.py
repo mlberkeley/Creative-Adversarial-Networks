@@ -20,7 +20,7 @@ class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=32, smoothing=0.9, lamb = 1.0,
-         use_resize=False,
+         use_resize=False, learning_rate = 1e-4, 
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False, can=True,
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None):
     """
@@ -47,6 +47,8 @@ class DCGAN(object):
     self.input_width = input_width
     self.output_height = output_height
     self.output_width = output_width
+    self.learning_rate = learning_rate
+    
 
     self.y_dim = y_dim
     self.z_dim = z_dim
@@ -134,27 +136,25 @@ class DCGAN(object):
     self.z = tf.placeholder(
       tf.float32, [None, self.z_dim], name='z')
     self.z_sum = histogram_summary("z", self.z)
+    
+    if self.wgan and not self.can:
+        self.d_update, self.g_update, self.losses, self.sums = WGAN_loss(self)
+    if self.wgan and self.can:
+        self.d_update, self.g_update, self.losses, self.sums = WCAN_loss(self)
+    if not self.wgan and self.can:
+        self.d_update, self.g_update, self.losses, self.sums = CAN_loss(self)
+    elif not self.wgan and not self.can:
+        self.d_update, self.g_update, self.losses, self.sums = GAN_loss(self)
 
     if self.can:
       self.sampler            = self.sampler(self.z)
     else:
       self.sampler            = self.sampler(self.z, self.y)
-    t_vars = tf.trainable_variables()
-
-    self.d_vars = [var for var in t_vars if 'd_' in var.name]
-    self.g_vars = [var for var in t_vars if 'g_' in var.name]
+    
 
     self.saver = tf.train.Saver()
-
+    
   def train(self, config):
-    if self.wgan and not self.can:
-        d_update, g_update, losses, sums = WGAN_loss(self, config)
-    if self.wgan and self.can:
-        d_update, g_update, losses, sums = WCAN_loss(self, config)
-    if not self.wgan and self.can:
-        d_update, g_update, losses, sums = CAN_loss(self, config)
-    elif not self.wgan and not self.can:
-        d_update, g_update, losses, sums = GAN_loss(self, config)
     #self.{g,d}_opt are created in the loss functions.
 
     
@@ -273,7 +273,7 @@ class DCGAN(object):
         if self.can:
         #update D
         
-          _, summary_str = self.sess.run([d_update, sums[0]],
+          _, summary_str = self.sess.run([self.d_update, self.sums[0]],
             feed_dict={
               self.inputs: batch_images,
               self.z: batch_z,
@@ -281,7 +281,7 @@ class DCGAN(object):
             })
           self.writer.add_summary(summary_str,counter)
         #Update G: don't need labels or inputs
-          _, summary_str = self.sess.run([g_update, sums[1]],
+          _, summary_str = self.sess.run([self.g_update, self.sums[1]],
             feed_dict={
               self.z: batch_z,
             })
@@ -313,7 +313,7 @@ class DCGAN(object):
           })
         else:
           # Update D network
-          _, summary_str = self.sess.run([d_optim, self.d_sum],
+          _, summary_str = self.sess.run([self.d_optim, self.d_sum],
             feed_dict={
               self.inputs: batch_images,
               self.z: batch_z,
@@ -322,7 +322,7 @@ class DCGAN(object):
           self.writer.add_summary(summary_str, counter)
 
           # Update G network
-          _, summary_str = self.sess.run([g_optim, self.g_sum],
+          _, summary_str = self.sess.run([self.g_optim, self.g_sum],
             feed_dict={
               self.z: batch_z,
               self.y: batch_labels,
