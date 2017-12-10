@@ -164,26 +164,24 @@ def WGAN_loss(model):
     model.g_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
     model.d_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
     
-    model.G = model.generator(model.z)
-    _, model.D_real, model.D_c, _ = model.discriminator(model.inputs, reuse=False)
-    model.sampler = model.sampler(model.z)
-    _, model.D_fake, model.D_c_, _ = model.discriminator(model.G, reuse=True)
+    model.G = model.generator(model.z, model.y)
+    _, model.D_real = model.discriminator(model.inputs, model.y, reuse=False)
+    _, model.D_fake = model.discriminator(model.G, model.y, reuse=True)
 
-    model.correct_prediction = tf.equal(tf.argmax(self.y,1), tf.argmax(self.D_c,1))
-    self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
     model.g_loss = -tf.reduce_mean(model.D_fake)
     model.d_loss = tf.reduce_mean(model.D_fake) - tf.reduce_mean(model.D_real)
     
     epsilon = tf.random_uniform(
-        shape=tf.shape(model.D_real),
+        shape= [model.batch_size, 1,1,1],
         minval=0.,
         maxval=1.
     )
     x_hat = model.inputs + epsilon * (model.G - model.inputs)
-    D_x_hat = model.discriminator(x_hat, reuse=True)
+    _, D_x_hat = model.discriminator(x_hat, model.y,reuse=True)
     grad_D_x_hat = tf.gradients(D_x_hat, [x_hat])[0]
-    slopes = tf.sqrt(tf.reduce_sum(tf.square(grad_D_x_hat), reduction_indices=[-1]))
-    gradient_penalty = tf.reduce_mean((slopes - 1.) ** 2)
+    model.slopes = tf.sqrt(tf.reduce_sum(tf.square(grad_D_x_hat), reduction_indices=[-1]))
+    gradient_penalty = tf.reduce_mean((model.slopes - 1.) ** 2)
     model.d_loss += 10 * gradient_penalty 
 
     t_vars = tf.trainable_variables()
@@ -202,10 +200,16 @@ def WGAN_loss(model):
         var_list=model.d_vars,
         colocate_gradients_with_ops=True
     )
-    d_update = model.g_opt.apply_gradients(g_gradvar)
+    d_update = model.d_opt.apply_gradients(d_gradvar)
     loss_ops = [model.d_loss, model.g_loss] 
-    #TODO summaries
-    return d_update, g_update, loss_ops, None
+    
+    model.G_sum = image_summary("G", model.G)
+
+    model.g_loss_sum = scalar_summary("g_loss", model.g_loss)
+    model.d_loss_sum = scalar_summary("d_loss", model.d_loss)
+    model.d_sum = merge_summary([model.d_loss_sum])
+    model.g_sum = merge_summary([model.g_loss_sum, model.G_sum])
+    return d_update, g_update, loss_ops, [model.d_sum, model.g_sum]
 
 
 
@@ -213,6 +217,8 @@ def conv_cond_concat(x, y):
   """Concatenate conditioning vector on feature map axis."""
   x_shapes = tf.shape(x)
   y_shapes = tf.shape(y)
+  print(x.name)
+  print(x.get_shape().as_list())
   return concat([
     x, y*tf.ones([x_shapes[0], x_shapes[1], x_shapes[2], y_shapes[3]])], 3)
 

@@ -49,12 +49,14 @@ class DCGAN(object):
     self.output_width = output_width
     self.learning_rate = learning_rate
     
-
+    
     self.y_dim = y_dim
     self.z_dim = z_dim
 
     self.gf_dim = gf_dim
     self.df_dim = df_dim
+    self.gf_dim = 32
+    self.df_dim = 16
 
     self.gfc_dim = gfc_dim
     self.dfc_dim = dfc_dim
@@ -179,7 +181,6 @@ class DCGAN(object):
       print(path+(3-len(num))*"0"+num)
       self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
 
-    #sample_z = n0random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
     sample_z = np.random.normal(0, 1, size=[self.sample_num, self.z_dim])
     sample_z /= np.linalg.norm(sample_z, axis=0)
     
@@ -219,21 +220,21 @@ class DCGAN(object):
 
     counter = 1
     start_time = time.time()
-    could_load, checkpoint_counter = self.load(self.checkpoint_dir)
-    if could_load:
-      counter = checkpoint_counter
-      replay_files = glob(os.path.join(self.model_dir + '_replay'))
-      self.experience_buffer =[
-                    get_image(sample_file,
-                    input_height=self.input_height,
-                    input_width=self.input_width,
-                    resize_height=self.output_height,
-                    resize_width=self.output_width,
-                    crop=self.crop,
-                    grayscale=self.grayscale) for sample_file in replay_files]      
-      print(" [*] Load SUCCESS")
-    else:
-      print(" [!] Load failed...")
+#    could_load, checkpoint_counter = self.load(self.checkpoint_dir)
+#    if could_load:
+#      counter = checkpoint_counter
+#      replay_files = glob(os.path.join(self.model_dir + '_replay'))
+      #self.experience_buffer =[
+      #              get_image(sample_file,
+      #              input_height=self.input_height,
+      #              input_width=self.input_width,
+      #              resize_height=self.output_height,
+      #              resize_width=self.output_width,
+      #              crop=self.crop,
+      #              grayscale=self.grayscale) for sample_file in replay_files]      
+      #print(" [*] Load SUCCESS")
+    #else:
+    #  print(" [!] Load failed...")
 
     for epoch in xrange(config.epoch):
       if config.dataset == 'mnist':
@@ -313,6 +314,23 @@ class DCGAN(object):
           })
         else:
           # Update D network
+          if self.wgan:
+            for i in range(4):
+              _, summary_str = self.sess.run([self.d_update, self.d_sum],
+                feed_dict={
+                  self.inputs: batch_images,
+                  self.z: batch_z,
+                  self.y: batch_labels,
+              })
+              self.writer.add_summary(summary_str, counter)
+              slopes = self.sess.run(self.slopes,
+            
+                feed_dict={
+                  self.inputs: batch_images,
+                  self.z: batch_z,
+                  self.y: batch_labels   
+              
+              })
           _, summary_str = self.sess.run([self.d_update, self.d_sum],
             feed_dict={
               self.inputs: batch_images,
@@ -328,15 +346,11 @@ class DCGAN(object):
               self.y: batch_labels,
             })
           self.writer.add_summary(summary_str, counter)
-
-          # Run g_optim twice to make sure that d_loss does not go to zero (different from paper)
-          errD_fake = self.d_loss_fake.eval({
-              self.z: batch_z,
-              self.y:batch_labels
-          })
-          errD_real = self.d_loss_real.eval({
+          
+          errD = self.d_loss.eval({
               self.inputs: batch_images,
-              self.y:batch_labels
+              self.y:batch_labels,
+              self.z:batch_z
           })
           errG = self.g_loss.eval({
               self.z: batch_z,
@@ -350,20 +364,26 @@ class DCGAN(object):
               time.time() - start_time, errD_fake+errD_real+errD_class_real, errG))
           print("Discriminator class acc: %.2f" % (accuracy))
         else:
-          print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
+          if self.wgan:
+            print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
-              time.time() - start_time, errD_fake+errD_real, errG))
-        if np.mod(counter, 64) == 1:
-          samp_images = self.G.eval({
-              self.z: batch_z
-          })       
-          for image in enumerate(samp_images):
-            self.experience_buffer.append(image)
+              time.time() - start_time, errD, errG))
+            
+          else: 
+            print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
+            % (epoch, idx, batch_idxs,
+              time.time() - start_time, errD, errG))
+        #if np.mod(counter, 64) == 1:
+        #  samp_images = self.G.eval({
+        #      self.z: batch_z, 
+        #  })       
+        #  for image in enumerate(samp_images):
+        #    self.experience_buffer.append(image)
 
-        if np.mod(counter, 400) == 1:
+        if np.mod(counter, 350) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
-            samples, d_loss, g_loss = self.sess.run(
-              [self.sampler, self.d_loss, self.g_loss],
+            samples = self.sess.run(
+              self.sampler,
               feed_dict={
                   self.z: sample_z,
                   self.inputs: sample_inputs,
@@ -372,7 +392,6 @@ class DCGAN(object):
             )
             save_images(samples, image_manifold_size(samples.shape[0]),
                   './{}/train_{:02d}_{:04d}.png'.format(config.sample_dir, epoch, idx))
-            print("[Sample] d_loss: %.8f, g_loss: %.8f" % (d_loss, g_loss))
           else:
             try:
               samples, d_loss, g_loss = self.sess.run(
@@ -404,8 +423,8 @@ class DCGAN(object):
         doesn't use y, as it tries to predict y
         """
         #Common base of convolutions
-        #h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
-        h1 = lrelu(self.d_bn1(conv2d(image, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
+        h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
+        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
         h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
         h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
         h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
@@ -422,24 +441,21 @@ class DCGAN(object):
 
         return tf.nn.sigmoid(r_out), r_out, c_softmax, c_out
       else:
-        yb = tf.reshape(y, [batch_dim, 1, 1, self.y_dim])
+        yb = tf.reshape(y, [-1, 1, 1, self.y_dim])
         image = conv_cond_concat(image, yb)
         h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
         h0 = conv_cond_concat(h0, yb)
-        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*4, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
+        h1 = lrelu(self.d_bn1(conv2d(h0, self.df_dim*2, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
         h1 = conv_cond_concat(h1, yb)
-        #h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
-        #h2 = conv_cond_concat(h2, yb)
-        #h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
-        #h3 = conv_cond_concat(h3, yb)
-        #h4 = lrelu(self.d_bn4(conv2d(h3, self.df_dim*16, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
-        #h4 = conv_cond_concat(h4, yb)
-        h5 = lrelu(self.d_bn5(conv2d(h1, self.df_dim*8, k_h=4, k_w=4, name='d_h5_conv', padding='VALID')))
-        shape = np.product(h5.get_shape()[1:].as_list())
-        h5 = tf.reshape(h5, [-1, shape])
-        h5 = concat([h5,y],1)
+        h2 = lrelu(self.d_bn2(conv2d(h1, self.df_dim*4, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
+        h2 = conv_cond_concat(h2, yb)
+        h3 = lrelu(self.d_bn3(conv2d(h2, self.df_dim*8, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
+        
+        shape = np.product(h3.get_shape()[1:].as_list())
+        h3 = tf.reshape(h3, [-1, shape])
+        h3 = concat([h3,y],1)
 
-        r_out = linear(h5, 1, 'd_ro_lin')
+        r_out = linear(h3, 1, 'd_ro_lin')
         return tf.nn.sigmoid(r_out), r_out
   def generator(self, z, y=None):
     with tf.variable_scope("generator") as scope:
@@ -507,52 +523,30 @@ class DCGAN(object):
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
         s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
-        #s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
-        #s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
-        #s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
+        s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
 
         # project `z` and reshape
 
-        yb = tf.reshape(y, [self.batch_size, 1, 1, self.y_dim])
+        yb = tf.reshape(y, [-1, 1, 1, self.y_dim])
         z = concat([z,y],1)
-        #z_ = linear(
-        #    z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
-        z_ = linear(
-             z, 4 * self.gf_dim * s_h8 * s_w8, 'g_h0_lin')
-        #h0 = tf.reshape(
-        #    z_, [-1, s_h64, s_w64, self.gf_dim * 16])
-        #h0 = lrelu(self.g_bn0(h0))
-        #h0 = conv_cond_concat(h0, yb)
+        h0 = lrelu(self.g_bn0(linear(z, self.gf_dim*8*s_h16*s_w16, 'g_h0_lin')))
+        h0 = tf.reshape(h0, [-1, s_h16, s_w16, self.gf_dim*8])
+        h0 = conv_cond_concat(h0, yb) 
+        
+        h1 = self.upsample(h0, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h1')
+        h1 = lrelu(self.g_bn1(h1))
+        h1 = conv_cond_concat(h1, yb)
 
-        #h1 = self.upsample(
-        #     h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        #h1 = lrelu(self.g_bn1(h1))
-        #h1 = conv_cond_concat(h1, yb)
+        h2 = self.upsample(h1, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h2')
+        h2 = lrelu(self.g_bn2(h2))
+        h2 = conv_cond_concat(h2, yb)
 
-        #h2 = self.upsample(
-        #     h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
-        #h2 = lrelu(self.g_bn2(h2))
-        #h2 = conv_cond_concat(h2, yb)
-        h2 = tf.reshape(
-            z_, [-1, s_h8, s_w8, self.gf_dim*4])
-        h3 = self.upsample(
-            h2, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+        h3 = self.upsample(h2, [-1, s_h2, s_w2, self.gf_dim], name='g_h3')
         h3 = lrelu(self.g_bn3(h3))
         h3 = conv_cond_concat(h3, yb)
 
-        h4 = self.upsample(
-            h3, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h4')
-        h4 = lrelu(self.g_bn4(h4))
-        h4 = conv_cond_concat(h4, yb)
-
-        h5 = self.upsample(
-            h4, [-1, s_h2, s_w2, self.gf_dim], name='g_h5')
-        h5 = lrelu(self.g_bn5(h5))
-        h5 = conv_cond_concat(h5, yb)
-
-        h6 = self.upsample(
-            h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
-        return tf.nn.tanh(h6)
+        h4 = self.upsample(h3, [-1, s_h, s_w, self.c_dim], name='g_h4')
+        return tf.nn.tanh(h4)
   def sampler(self, z, y=None):
     with tf.variable_scope("generator") as scope:
       scope.reuse_variables()
@@ -595,44 +589,30 @@ class DCGAN(object):
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
         s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
-        #s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
-        #s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
-        #s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
+        s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
+
+        # project `z` and reshape
 
         yb = tf.reshape(y, [-1, 1, 1, self.y_dim])
         z = concat([z,y],1)
-        #z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
-        z_ = linear(z, 4 * self.gf_dim * s_h8 * s_w8, 'g_h0_lin')
-        h2 = tf.reshape(z_, [-1, s_h8, s_w8, self.gf_dim * 4])
-        #h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
-        #h0 = lrelu(self.g_bn0(h0, train=False))
-        #h0 = conv_cond_concat(h0,yb)
+        h0 = lrelu(self.g_bn0(linear(z, self.gf_dim*8*s_h16*s_w16, 'g_h0_lin'), train=False))
+        h0 = tf.reshape(h0, [-1, s_h16, s_w16, self.gf_dim*8])
+        h0 = conv_cond_concat(h0, yb) 
+        
+        h1 = self.upsample(h0, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h1')
+        h1 = lrelu(self.g_bn1(h1, train=False))
+        h1 = conv_cond_concat(h1, yb)
 
-        #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
+        h2 = self.upsample(h1, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h2')
+        h2 = lrelu(self.g_bn2(h2, train=False))
+        h2 = conv_cond_concat(h2, yb)
 
-        #h1 = self.upsample(h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        #h1 = lrelu(self.g_bn1(h1, train=False))
-        #h1 = conv_cond_concat(h1,yb)
-
-        #h2 = self.upsample(h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
-        #h2 = lrelu(self.g_bn2(h2, train=False))
-        #h2 = conv_cond_concat(h2,yb)
-
-        h3 = self.upsample(h2, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+        h3 = self.upsample(h2, [-1, s_h2, s_w2, self.gf_dim], name='g_h3')
         h3 = lrelu(self.g_bn3(h3, train=False))
-        h3 = conv_cond_concat(h3,yb)
+        h3 = conv_cond_concat(h3, yb)
 
-        h4 = self.upsample(h3, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h4')
-        h4 = lrelu(self.g_bn4(h4, train=False))
-        h4 = conv_cond_concat(h4,yb)
-
-        h5 = self.upsample(h4, [-1, s_h2, s_w2, self.gf_dim], name='g_h5')
-        h5 = lrelu(self.g_bn5(h5, train=False))
-        h5 = conv_cond_concat(h5,yb)
-
-        h6 = self.upsample(h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
-
-        return tf.nn.tanh(h6)
+        h4 = self.upsample(h3, [-1, s_h, s_w, self.c_dim], name='g_h4')
+        return tf.nn.tanh(h4)
 
   def get_y(self, sample_inputs):
     ret = []
