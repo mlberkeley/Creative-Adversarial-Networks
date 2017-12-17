@@ -79,7 +79,6 @@ class DCGAN(object):
     self.can = can
     self.wgan = wgan
     self.use_resize = use_resize
-    #if we do implement wGAN+CAN
 
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
@@ -178,7 +177,8 @@ class DCGAN(object):
       print(path+(3-len(num))*"0"+num)
       self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
 
-    sample_z = np.random.normal(0, 1, size=[self.sample_num, self.z_dim])
+    sample_z = np.random.normal(0, 1, [self.sample_num, self.z_dim]) \
+              .astype(np.float32)
     sample_z /= np.linalg.norm(sample_z, axis=0)
     
     if config.dataset == 'mnist':
@@ -441,17 +441,17 @@ class DCGAN(object):
         #no batchnorm for WGAN GP
         yb = tf.reshape(y, [-1, 1, 1, self.y_dim])
         image = conv_cond_concat(image, yb)
-        h0 = lrelu(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID'))
+        h0 = lrelu(layer_norm(conv2d(image, self.df_dim, k_h=4, k_w=4, name='d_h0_conv',padding='VALID')))
         h0 = conv_cond_concat(h0, yb)
-        h1 = lrelu(conv2d(h0, self.df_dim*4, k_h=4, k_w=4, name='d_h1_conv', padding='VALID'))
+        h1 = lrelu(layer_norm(conv2d(h0, self.df_dim*4, k_h=4, k_w=4, name='d_h1_conv', padding='VALID')))
         h1 = conv_cond_concat(h1, yb)
-        h2 = lrelu(conv2d(h1, self.df_dim*8, k_h=4, k_w=4, name='d_h2_conv', padding='VALID'))
+        h2 = lrelu(layer_norm(conv2d(h1, self.df_dim*8, k_h=4, k_w=4, name='d_h2_conv', padding='VALID')))
         h2 = conv_cond_concat(h2, yb)
-        h3 = lrelu(conv2d(h2, self.df_dim*16, k_h=4, k_w=4, name='d_h3_conv', padding='VALID'))
+        h3 = lrelu(layer_norm(conv2d(h2, self.df_dim*16, k_h=4, k_w=4, name='d_h3_conv', padding='VALID')))
         h3 = conv_cond_concat(h3, yb)
-        h4 = lrelu(conv2d(h3, self.df_dim*32, k_h=4, k_w=4, name='d_h4_conv', padding='VALID'))
+        h4 = lrelu(layer_norm(conv2d(h3, self.df_dim*32, k_h=4, k_w=4, name='d_h4_conv', padding='VALID')))
         h4 = conv_cond_concat(h4, yb)
-        h5 = lrelu(conv2d(h4, self.df_dim*32, k_h=4, k_w=4, name='d_h5_conv', padding='VALID'))
+        h5 = lrelu(layer_norm(conv2d(h4, self.df_dim*32, k_h=4, k_w=4, name='d_h5_conv', padding='VALID')))
         
         shape = np.product(h5.get_shape()[1:].as_list())
         h5 = tf.reshape(h5, [-1, shape])
@@ -459,6 +459,7 @@ class DCGAN(object):
 
         r_out = linear(h5, 1, 'd_ro_lin')
         return tf.nn.sigmoid(r_out), r_out
+
   def generator(self, z, y=None):
     with tf.variable_scope("generator") as scope:
       if self.can:
@@ -541,7 +542,7 @@ class DCGAN(object):
         h1 = lrelu(self.g_bn1(h1))
         h1 = conv_cond_concat(h1, yb)
 
-        h2 = self.upsample(h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+        h2 = self.upsample(h0, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = lrelu(self.g_bn2(h2))
         h2 = conv_cond_concat(h2, yb)
 
@@ -617,7 +618,7 @@ class DCGAN(object):
         h1 = lrelu(self.g_bn1(h1, train=False))
         h1 = conv_cond_concat(h1, yb)
 
-        h2 = self.upsample(h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+        h2 = self.upsample(h0, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
         h2 = lrelu(self.g_bn2(h2, train=False))
         h2 = conv_cond_concat(h2, yb)
 

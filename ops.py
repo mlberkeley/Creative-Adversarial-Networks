@@ -32,6 +32,9 @@ def sigmoid_cross_entropy_with_logits(x, y):
       except:
         return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
 
+def layer_norm(inputs):
+   return tf.contrib.layers.layer_norm(inputs)
+
 class batch_norm(object):
   def __init__(self, epsilon=1e-5, momentum = 0.9, name="batch_norm"):
     with tf.variable_scope(name):
