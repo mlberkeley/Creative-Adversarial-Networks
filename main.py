@@ -1,6 +1,7 @@
 import os
 import scipy.misc
 import numpy as np
+from glob import glob
 
 from model import DCGAN
 from utils import pp, visualize, show_all_variables
@@ -23,8 +24,9 @@ flags.DEFINE_integer("output_height", 64, "The size of the output images to prod
 flags.DEFINE_integer("output_width", None, "The size of the output images to produce. If None, same value as output_height [None]")
 flags.DEFINE_string("dataset", "celebA", "The name of dataset [celebA, mnist, lsun]")
 flags.DEFINE_string("input_fname_pattern", "*.jpg", "Glob pattern of filename of input images [*]")
-flags.DEFINE_string("checkpoint_dir", "checkpoint", "Directory name to save the checkpoints [checkpoint]")
-flags.DEFINE_string("sample_dir", "samples", "Directory name to save the image samples [samples]")
+flags.DEFINE_string("log_dir", 'logs', "Directory to store logs [logs]")
+flags.DEFINE_string("checkpoint_dir", None, "Directory name to save the checkpoints [<FLAGS.log_dir>/checkpoint]")
+flags.DEFINE_string("sample_dir", None, "Directory name to save the image samples [<FLAGS.log_dir>/samples]")
 flags.DEFINE_boolean("train", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
@@ -34,17 +36,19 @@ flags.DEFINE_boolean("use_s3", False, "True if you want to use s3 buckets, False
 flags.DEFINE_string("s3_bucket", None, "the s3_bucket to upload results to")
 flags.DEFINE_boolean("replay", True, "True if using experience replay [True]")
 flags.DEFINE_boolean("use_resize", False, "True if resize conv for upsampling, False for fractionally strided conv [False]")
+flags.DEFINE_boolean("use_default_checkpoint", False, "True only if checkpoint_dir is None. Don't set this")
 FLAGS = flags.FLAGS
 
 def main(_):
+  print('Before processing flags')
   pp.pprint(flags.FLAGS.__flags)
   if FLAGS.use_s3:
     import aws
     if FLAGS.s3_bucket is None:
-      raise ArgumentError('use_s3 flag set, but no bucket set. ')
+      raise ValueError('use_s3 flag set, but no bucket set. ')
     # check to see if s3 bucket exists:
     elif not aws.bucket_exists(FLAGS.s3_bucket):
-      raise ArgumentError('`use_s3` flag set, but bucket "%s" doesn\'t exist. Not using s3' % FLAGS.s3_bucket)
+      raise ValueError('`use_s3` flag set, but bucket "%s" doesn\'t exist. Not using s3' % FLAGS.s3_bucket)
 
 
   if FLAGS.input_width is None:
@@ -52,10 +56,41 @@ def main(_):
   if FLAGS.output_width is None:
     FLAGS.output_width = FLAGS.output_height
 
+
+
+  # configure the log_dir to match the params
+  log_dir = os.path.join(FLAGS.log_dir, "dataset={},isCan={},lr={},imsize={},batch_size={}".format(
+                FLAGS.dataset,
+                FLAGS.can,
+                FLAGS.learning_rate,
+                FLAGS.input_height,
+                FLAGS.batch_size))
+  if not glob(log_dir + "*"):
+    log_dir = os.path.join(log_dir, "000")
+  else:
+    containing_dir=os.path.join(log_dir, "*")
+    print(containing_dir)
+    nums = [int(x[-3:]) for x in glob(containing_dir)] # TODO FIX THESE HACKS
+    print('nums', nums)
+    num = str(max(nums) + 1)
+    log_dir = os.path.join(log_dir,(3-len(num))*"0"+num)
+  FLAGS.log_dir = log_dir
+
+  if FLAGS.checkpoint_dir is None:
+    FLAGS.checkpoint_dir = os.path.join(FLAGS.log_dir, 'checkpoint')
+    FLAGS.use_default_checkpoint = True
+  elif FLAGS.use_default_checkpoint:
+    raise ValueError('`use_default_checkpoint` flag only works if you keep checkpoint_dir as None')
+
+  if FLAGS.sample_dir is None:
+    FLAGS.sample_dir = os.path.join(FLAGS.log_dir, 'samples')
+
   if not os.path.exists(FLAGS.checkpoint_dir):
     os.makedirs(FLAGS.checkpoint_dir)
   if not os.path.exists(FLAGS.sample_dir):
     os.makedirs(FLAGS.sample_dir)
+  print('After processing flags')
+  pp.pprint(flags.FLAGS.__flags)
 
   run_config = tf.ConfigProto()
   run_config.gpu_options.allow_growth=True

@@ -255,23 +255,10 @@ class DCGAN(object):
         [self.z_sum, self.d_sum, self.d_loss_real_sum, self.d_loss_sum])
 
 
-    path = os.path.join('logs', "dataset={},isCan={},lr={},imsize={},batch_size={}".format(config.dataset,
-                                                                                        self.can,
-                                                                                        config.learning_rate,
-                                                                                        self.input_height,
-                                                                                        self.batch_size))
+    # TODO refactor path = self.log_dir. Waiting for merge
+    self.log_dir = config.log_dir
 
-    self.log_dir = path
-
-    if not glob(path + "*"):
-      path = path + "000"
-      print(path)
-      self.writer = SummaryWriter(path, self.sess.graph)
-    else:
-      nums = [int(x[-3:]) for x in glob(path+"*")]
-      num = str(max(nums) + 1)
-      print(path+(3-len(num))*"0"+num)
-      self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
+    self.writer = SummaryWriter(self.log_dir, self.sess.graph)
 
     #sample_z = n0random.uniform(-1, 1, size=(self.sample_num , self.z_dim))
     sample_z = np.random.normal(0, 1, size=[self.sample_num, self.z_dim])
@@ -313,7 +300,7 @@ class DCGAN(object):
 
     counter = 1
     start_time = time.time()
-    could_load, checkpoint_counter = self.load(self.checkpoint_dir)
+    could_load, checkpoint_counter = self.load(self.checkpoint_dir, config)
     if could_load:
       counter = checkpoint_counter
       replay_files = glob(os.path.join(self.model_dir + '_replay'))
@@ -795,7 +782,8 @@ class DCGAN(object):
 
   def save(self, checkpoint_dir, step, config):
     model_name = "DCGAN.model"
-    checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
+    if not config.use_default_checkpoint:
+      checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
 
     if not os.path.exists(checkpoint_dir):
       os.makedirs(checkpoint_dir)
@@ -827,10 +815,12 @@ class DCGAN(object):
     else:
       print(" [*] Failed to find a checkpoint")
       return False, 0
-  def load(self, checkpoint_dir):
+
+  def load(self, checkpoint_dir, config):
     import re
     print(" [*] Reading checkpoints...")
-    checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
+    if not config.use_default_checkpoint:
+      checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
 
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
     if ckpt and ckpt.model_checkpoint_path:
