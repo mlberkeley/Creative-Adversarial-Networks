@@ -173,7 +173,7 @@ def WGAN_loss(model):
 
 
     model.g_loss = -tf.reduce_mean(model.D_fake)
-    model.wp= tf.reduce_mean(model.D_fake) - tf.reduce_mean(model.D_real)
+    model.wp= -tf.reduce_mean(model.D_fake) + tf.reduce_mean(model.D_real)
     
     epsilon = tf.random_uniform(
         shape= [model.batch_size, 1,1,1],
@@ -184,8 +184,8 @@ def WGAN_loss(model):
     _, D_x_hat = model.discriminator(x_hat, model.y,reuse=True)
     grad_D_x_hat = tf.gradients(D_x_hat, [x_hat])[0]
     model.slopes = tf.sqrt(tf.reduce_sum(tf.square(grad_D_x_hat), reduction_indices=[1,2,3]))
-    gradient_penalty = tf.reduce_mean((model.slopes - 1.) ** 2)
-    model.d_loss = model.wp + 10 * gradient_penalty 
+    model.gradient_penalty = tf.reduce_mean((model.slopes - 1.) ** 2)
+    model.d_loss = -model.wp + 10 * model.gradient_penalty 
 
     t_vars = tf.trainable_variables()
     model.d_vars = [var for var in t_vars if 'd_' in var.name]
@@ -211,8 +211,9 @@ def WGAN_loss(model):
     model.g_loss_sum = scalar_summary("g_loss", model.g_loss)
     model.d_loss_sum = scalar_summary("d_loss", model.d_loss)
     model.wp_sum = scalar_summary("wasserstein_penalty", model.wp)
-    
-    model.d_sum = merge_summary([model.d_loss_sum, model.wp_sum])
+    model.gp_sum = scalar_summary("gradient_penalty", model.gradient_penalty)    
+
+    model.d_sum = merge_summary([model.d_loss_sum, model.wp_sum, model.gp_sum])
     model.g_sum = merge_summary([model.g_loss_sum, model.G_sum])
     return d_update, g_update, loss_ops, [model.d_sum, model.g_sum]
 
