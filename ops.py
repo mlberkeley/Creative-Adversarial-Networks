@@ -5,6 +5,8 @@ import tensorflow as tf
 from tensorflow.python.framework import ops
 
 from utils import *
+import generators
+import discriminators
 
 try:
   image_summary = tf.image_summary
@@ -52,6 +54,8 @@ class batch_norm(object):
                       scope=self.name)
 def CAN_loss(model):
     #builds optimizers and losses
+    
+    
     model.G                  = model.generator(model.z)
     model.D, model.D_logits, model.D_c, model.D_c_logits     = model.discriminator(
                                                               model.inputs, reuse=False)
@@ -166,7 +170,7 @@ def GAN_loss(model):
 def WGAN_loss(model):
     model.g_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
     model.d_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
-    
+
     model.G = model.generator(model.z, model.y)
     _, model.D_real = model.discriminator(model.inputs, model.y, reuse=False)
     _, model.D_fake = model.discriminator(model.G, model.y, reuse=True)
