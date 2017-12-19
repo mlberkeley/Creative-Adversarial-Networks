@@ -419,7 +419,6 @@ class DCGAN(object):
         if np.mod(counter, 500) == 2:
           self.save(config.checkpoint_dir, counter)
 
-
   def get_y(self, sample_inputs):
     ret = []
     for sample in sample_inputs:
