@@ -41,7 +41,7 @@ def vanilla_can(model, z, is_sampler=False):
 
         return tf.nn.tanh(h6)
 
-def vanilla_wgan(model, z, y, is_sampler=False):
+def wgan_cond(model, z, y, is_sampler=False):
     with tf.variable_scope("generator") as scope:
         s_h, s_w = model.output_height, model.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
@@ -83,7 +83,7 @@ def vanilla_wgan(model, z, y, is_sampler=False):
         h6 = model.upsample(h5, [-1, s_h, s_w, model.c_dim], name='g_h6')
         return tf.nn.tanh(h6)
 
-def vanilla_wgan_no_y(model, z, is_sampler=False):
+def vanilla_wgan(model, z, is_sampler=False):
     with tf.variable_scope("generator") as scope:
         s_h, s_w = model.output_height, model.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
@@ -149,7 +149,7 @@ def can_slim(model, z, is_sampler=False):
 
         return tf.nn.tanh(h4)
 
-def wgan_slim(model, z, y, is_sampler=False):
+def wgan_slim_cond(model, z, y, is_sampler=False):
     with tf.variable_scope("generator") as scope:
         s_h, s_w = model.output_height, model.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
@@ -183,7 +183,7 @@ def wgan_slim(model, z, y, is_sampler=False):
         return tf.nn.tanh(h4)
 
 
-def wgan_no_y_slim(model, z, is_sampler=False):
+def wgan_slim(model, z, is_sampler=False):
     with tf.variable_scope("generator") as scope:
         s_h, s_w = model.output_height, model.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
@@ -214,3 +214,55 @@ def wgan_no_y_slim(model, z, is_sampler=False):
             h3, [-1, s_h, s_w, model.c_dim], name='g_h4')
 
         return tf.nn.tanh(h4)
+
+def dcgan(model, z, is_sampler=False):
+    with tf.variable_scope("generator") as scope:
+        s_h, s_w = model.output_height, model.output_width
+        s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)
+        s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)
+        s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)
+        s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)
+        
+        z_ = linear(z, model.gf_dim*8*s_h16*s_w16, 'g_h0_lin')
+        h0 = tf.reshape(z_, [-1, s_h16, s_w16, model.gf_dim*8])
+        h0 = lrelu(model.g_bn0(h0, train=is_sampler))
+        h1 = model.upsample(h0, [-1, s_h8, s_w8, model.gf_dim*4], name='g_h1')
+        h1 = lrelu(model.g_bn1(h1, train=is_sampler))
+        h2 = model.upsample(h1, [-1, s_h4, s_w4, model.gf_dim*2], name='g_h2')
+        h2 = lrelu(model.g_bn2(h2, train=is_sampler))
+        h3 = model.upsample(h2, [-1, s_h2, s_w2, model.gf_dim*1], name='g_h3')
+        h3 = lrelu(model.g_bn3(h3, train=is_sampler))
+        h4 = model.upsample(h3, [-1, s_h, s_w, model.c_dim], name='g_h4')
+        return tf.nn.tanh(h4)
+
+def dcgan_cond(model, z, y, is_sampler=False):
+    with tf.variable_scope("generator") as scope:
+        s_h, s_w = model.output_height, model.output_width
+        s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)
+        s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)
+        s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)
+        s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)
+        
+        z = concat([z,y], 1)
+        yb = tf.reshape(y, [-1, 1, 1, model.y_dim])
+        z_ = linear(z, model.gf_dim*8*s_h16*s_w16, 'g_h0_lin')
+
+        h0 = tf.reshape(z_, [-1, s_h16, s_w16, model.gf_dim*8])
+        h0 = lrelu(model.g_bn0(h0, train=is_sampler))
+        h0 = conv_cond_concat(h0, yb)
+
+        h1 = model.upsample(h0, [-1, s_h8, s_w8, model.gf_dim*4], name='g_h1')
+        h1 = lrelu(model.g_bn1(h1, train=is_sampler))
+        h1 = conv_cond_concat(h1, yb)
+
+        h2 = model.upsample(h1, [-1, s_h4, s_w4, model.gf_dim*2], name='g_h2')
+        h2 = lrelu(model.g_bn2(h2, train=is_sampler))
+        h2 = conv_cond_concat(h2, yb)
+
+        h3 = model.upsample(h2, [-1, s_h2, s_w2, model.gf_dim*1], name='g_h3')
+        h3 = lrelu(model.g_bn3(h3, train=is_sampler))
+        h3 = conv_cond_concat(h3, yb)
+
+        h4 = model.upsample(h3, [-1, s_h, s_w, model.c_dim], name='g_h4')
+        return tf.nn.tanh(h4)
+
