@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from ops import conv_cond_concat
 from ops import *
 
 def vanilla_can(model, image, reuse=False):
@@ -128,10 +129,10 @@ def dcwgan(model, image, reuse=False):
     with tf.variable_scope("discriminator") as scope:
         if reuse:
             scope.reuse_variables()
-        h0 = lrelu(conv2d(image, self.df_dim, name='d_h0_conv'))
-        h1 = lrelu(layer_norm(conv2d(h0, self.df_dim*2, name='d_h1_conv')))
-        h2 = lrelu(layer_norm(conv2d(h1, self.df_dim*4, name='d_h2_conv')))
-        h3 = lrelu(layer_norm(conv2d(h2, self.df_dim*8, name='d_h3_conv')))
+        h0 = lrelu(conv2d(image, model.df_dim, name='d_h0_conv'))
+        h1 = lrelu(layer_norm(conv2d(h0, model.df_dim*2, name='d_h1_conv')))
+        h2 = lrelu(layer_norm(conv2d(h1, model.df_dim*4, name='d_h2_conv')))
+        h3 = lrelu(layer_norm(conv2d(h2, model.df_dim*8, name='d_h3_conv')))
         shape = np.product(h3.get_shape()[1:].as_list())
         h4 = linear(tf.reshape(h3, [-1, shape]), 1, 'd_h4_lin')
         return h4
@@ -140,12 +141,12 @@ def dcwgan_cond(model, image, y, reuse=False):
     with tf.variable_scope("discriminator") as scope:
         if reuse:
             scope.reuse_variables()
-        yb = tf.reshape(y, [-1, 1, 1, self.y_dim])
+        yb = tf.reshape(y, [-1, 1, 1, model.y_dim])
         x = conv_cond_concat(image, yb)
-        h0 = lrelu(conv2d(x, self.df_dim, name='d_h0_conv'))
-        h1 = lrelu(layer_norm(conv2d(h0, self.df_dim*2, name='d_h1_conv')))
-        h2 = lrelu(layer_norm(conv2d(h1, self.df_dim*4, name='d_h2_conv')))
-        h3 = lrelu(layer_norm(conv2d(h2, self.df_dim*8, name='d_h3_conv')))
+        h0 = lrelu(conv2d(x, model.df_dim, name='d_h0_conv'))
+        h1 = lrelu(layer_norm(conv2d(h0, model.df_dim*2, name='d_h1_conv')))
+        h2 = lrelu(layer_norm(conv2d(h1, model.df_dim*4, name='d_h2_conv')))
+        h3 = lrelu(layer_norm(conv2d(h2, model.df_dim*8, name='d_h3_conv')))
         shape = np.product(h3.get_shape()[1:].as_list())
         h4 = linear(tf.reshape(h3, [-1, shape]), 1, 'd_h4_lin')
         return h4

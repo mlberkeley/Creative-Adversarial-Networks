@@ -4,6 +4,8 @@ from ops import *
 
 def vanilla_can(model, z, is_sampler=False):
     with tf.variable_scope("generator") as scope:
+        if is_sampler:
+            scope.reuse_variables()
         s_h, s_w = model.output_height, model.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -43,6 +45,8 @@ def vanilla_can(model, z, is_sampler=False):
 
 def wgan_cond(model, z, y, is_sampler=False):
     with tf.variable_scope("generator") as scope:
+        if is_sampler:
+            scope.reuse_variables()
         s_h, s_w = model.output_height, model.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -85,6 +89,8 @@ def wgan_cond(model, z, y, is_sampler=False):
 
 def vanilla_wgan(model, z, is_sampler=False):
     with tf.variable_scope("generator") as scope:
+        if is_sampler:
+            scope.reuse_variables()
         s_h, s_w = model.output_height, model.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -119,6 +125,8 @@ def vanilla_wgan(model, z, is_sampler=False):
 
 def can_slim(model, z, is_sampler=False):
     with tf.variable_scope("generator") as scope:
+        if is_sampler:
+            scope.reuse_variables()
         s_h, s_w = model.output_height, model.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -151,6 +159,8 @@ def can_slim(model, z, is_sampler=False):
 
 def wgan_slim_cond(model, z, y, is_sampler=False):
     with tf.variable_scope("generator") as scope:
+        if is_sampler:
+            scope.reuse_variables()
         s_h, s_w = model.output_height, model.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -159,7 +169,7 @@ def wgan_slim_cond(model, z, y, is_sampler=False):
 
         # project `z` and reshape
         yb = tf.reshape(y, [-1, 1, 1, model.y_dim])
-        z = concat([z_,y],1)
+        z = concat([z,y],1)
         z_ = linear(z, model.gf_dim*s_h16*s_w16*8, 'g_h0_lin')
         z_ = tf.reshape(z_, [-1, s_h16, s_w16, model.gf_dim*8]) 
 
@@ -180,11 +190,14 @@ def wgan_slim_cond(model, z, y, is_sampler=False):
         h3 = conv_cond_concat(h3, yb)
 
         h4 = model.upsample(h3, [-1, s_h, s_w, model.c_dim], name='g_h4')
+        print(h4.get_shape().as_list())
         return tf.nn.tanh(h4)
 
 
 def wgan_slim(model, z, is_sampler=False):
     with tf.variable_scope("generator") as scope:
+        if is_sampler:
+            scope.reuse_variables()
         s_h, s_w = model.output_height, model.output_width #256/256
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
@@ -217,6 +230,8 @@ def wgan_slim(model, z, is_sampler=False):
 
 def dcgan(model, z, is_sampler=False):
     with tf.variable_scope("generator") as scope:
+        if is_sampler:
+            scope.reuse_variables()
         s_h, s_w = model.output_height, model.output_width
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)
@@ -237,6 +252,8 @@ def dcgan(model, z, is_sampler=False):
 
 def dcgan_cond(model, z, y, is_sampler=False):
     with tf.variable_scope("generator") as scope:
+        if is_sampler:
+            scope.reuse_variables()
         s_h, s_w = model.output_height, model.output_width
         s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)
         s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)

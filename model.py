@@ -14,9 +14,7 @@ import discriminators
 
 from ops import *
 from utils import *
-
-def conv_out_size_same(size, stride):
-  return int(math.ceil(float(size) / float(stride)))
+from losses import * 
 
 class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
@@ -139,8 +137,8 @@ class DCGAN(object):
     self.z_sum = histogram_summary("z", self.z)
     
     if self.wgan and not self.can:
-        self.discriminator = discriminators.vanilla_wgan
-        self.generator = generators.vanilla_wgan
+        self.discriminator = discriminators.dcwgan_cond
+        self.generator = generators.dcgan_cond
         self.d_update, self.g_update, self.losses, self.sums = WGAN_loss(self)
         
     if self.wgan and self.can:
@@ -158,9 +156,9 @@ class DCGAN(object):
         self.d_update, self.g_update, self.losses, self.sums = GAN_loss(self)
 
     if self.can or not self.y_dim:
-        self.sampler            = self.generator(self.z, is_sampler=True)
+        self.sampler            = self.generator(self, self.z, is_sampler=True)
     else:
-        self.sampler            = self.generator(self.z, self.y, is_sampler=True)
+        self.sampler            = self.generator(self, self.z, self.y, is_sampler=True)
 
     self.saver = tf.train.Saver()
     
