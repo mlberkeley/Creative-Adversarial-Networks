@@ -204,6 +204,15 @@ def get_max_end(path_dir, num_len=3, fname_pattern='*.jpg'):
       max_ = curr
   return max_
 
+def conv_cond_concat(x, y):
+  """Concatenate conditioning vector on feature map axis."""
+  x_shapes = tf.shape(x)
+  y_shapes = tf.shape(y)
+  print(x.name)
+  print(x.get_shape().as_list())
+  return concat([
+    x, y*tf.ones([x_shapes[0], x_shapes[1], x_shapes[2], y_shapes[3]])], 3)
+
 def image_manifold_size(num_images):
   print(num_images)
   manifold_h = int(np.floor(np.sqrt(num_images)))

@@ -171,9 +171,9 @@ def WGAN_loss(model):
     model.g_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
     model.d_opt = tf.train.AdamOptimizer(learning_rate=model.learning_rate, beta1=0.5)
 
-    model.G = model.generator(model.z, model.y)
-    _, model.D_real = model.discriminator(model.inputs, model.y, reuse=False)
-    _, model.D_fake = model.discriminator(model.G, model.y, reuse=True)
+    model.G = model.generator(model, model.z, model.y)
+    model.D_real = model.discriminator(model, model.inputs, model.y, reuse=False)
+    model.D_fake = model.discriminator(model, model.G, model.y, reuse=True)
 
 
     model.g_loss = -tf.reduce_mean(model.D_fake)
@@ -185,7 +185,7 @@ def WGAN_loss(model):
         maxval=1.
     )
     x_hat = model.inputs + epsilon * (model.G - model.inputs)
-    _, D_x_hat = model.discriminator(x_hat, model.y,reuse=True)
+    D_x_hat = model.discriminator(x_hat, model.y,reuse=True)
     grad_D_x_hat = tf.gradients(D_x_hat, [x_hat])[0]
     model.slopes = tf.sqrt(tf.reduce_sum(tf.square(grad_D_x_hat), reduction_indices=[1,2,3]))
     gradient_penalty = tf.reduce_mean((model.slopes - 1.) ** 2)
