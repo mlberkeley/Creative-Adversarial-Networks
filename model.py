@@ -9,6 +9,7 @@ import numpy as np
 from six.moves import xrange
 from random import shuffle
 from operator import mul
+from slim.nets import nets_factory
 
 from ops import *
 from utils import *
@@ -20,7 +21,7 @@ class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=32, smoothing=0.9, lamb = 1.0,
-         use_resize=False, replay=True,
+         use_resize=False, replay=True, style_net_checkpoint=None,
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False, can=True,
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None, old_model=False):
     """
@@ -72,6 +73,9 @@ class DCGAN(object):
     self.g_bn4 = batch_norm(name='g_bn4')
     self.g_bn5 = batch_norm(name='g_bn5')
 
+    # variables that determines whether to use style net separate from discriminator
+    self.style_net_checkpoint = style_net_checkpoint
+
     self.smoothing = smoothing
     self.lamb = lamb
 
@@ -119,6 +123,18 @@ class DCGAN(object):
 
     return deconv2d(input_=input_, output_shape=output_shape,
         k_h=k_h, k_w=k_w, d_h=d_h, d_w=d_w, name= (name or "deconv2d"))
+  def make_style_net(self, images):
+    with tf.device("/gpu:0"):
+      network_fn = nets_factory.get_network_fn(
+          'inception_resnet_v2',
+          num_classes=27,
+          is_training=False)
+      if images.shape[1:3] != (256, 256):
+        # TODO check that the if statement works when the image shape is actually 256, 256
+        images = tf.image.resize_images(images, [256, 256])
+      logits, _ = network_fn(images)
+      logits = tf.stop_gradient(logits)
+      return logits
 
   def build_model(self, old_model=False):
     print('build_model', old_model)
@@ -166,6 +182,8 @@ class DCGAN(object):
 
       self.D_, self.D_logits_, self.D_c_, self.D_c_logits_ = self.discriminator(
                                                                 self.G, reuse=True, old_model=old_model)
+      if self.style_net_checkpoint:
+        self.style_net = self.make_style_net(self.G)
       self.d_sum = histogram_summary("d", self.D)
       self.d__sum = histogram_summary("d_", self.D_)
       self.d_c_sum = histogram_summary("d_c", self.D_c)
@@ -186,9 +204,14 @@ class DCGAN(object):
 
       self.d_loss_class_real = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits, labels=self.smoothing * self.y))
-      self.g_loss_class_fake = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits_,
-          labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
+      if self.style_net_checkpoint:
+        self.g_loss_class_fake = tf.reduce_mean(
+          tf.nn.softmax_cross_entropy_with_logits(logits=self.style_net,
+            labels=(1.0/self.y_dim)*tf.ones_like(self.style_net)))
+      else:
+        self.g_loss_class_fake = tf.reduce_mean(
+          tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits,
+            labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
 
       self.g_loss_fake = -tf.reduce_mean(tf.log(self.D_))
 
@@ -230,10 +253,19 @@ class DCGAN(object):
 
     self.d_vars = [var for var in t_vars if 'd_' in var.name]
     self.g_vars = [var for var in t_vars if 'g_' in var.name]
-
-    self.saver = tf.train.Saver()
-
+    if self.style_net_checkpoint:
+      all_vars = tf.trainable_variables()
+      style_net_vars = [v for v in all_vars if 'InceptionResnetV2' in v.name]
+      other_vars = [v for v in all_vars if 'InceptionResnetV2' not in v.name]
+      self.saver = tf.train.Saver(var_list=other_vars)
+      self.style_net_saver = tf.train.Saver(var_list=style_net_vars)
+    else:
+      self.saver=tf.train.Saver()
+  def set_sess(self, sess):
+    self.sess = sess
   def train(self, config):
+    if self.sess is None:
+      raise ValueError('Set session with set_sess(sess) before running')
     d_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
               .minimize(self.d_loss, var_list=self.d_vars)
     g_optim = tf.train.AdamOptimizer(config.learning_rate, beta1=config.beta1) \
@@ -300,7 +332,9 @@ class DCGAN(object):
 
     counter = 1
     start_time = time.time()
-    could_load, checkpoint_counter = self.load(self.checkpoint_dir, config)
+    could_load, checkpoint_counter = self.load(self.checkpoint_dir,
+        config,
+        style_net_checkpoint_dir=self.style_net_checkpoint)
     if could_load:
       counter = checkpoint_counter
       replay_files = glob(os.path.join(self.model_dir + '_replay'))
@@ -816,12 +850,18 @@ class DCGAN(object):
       print(" [*] Failed to find a checkpoint")
       return False, 0
 
-  def load(self, checkpoint_dir, config):
+  def load(self, checkpoint_dir, config, style_net_checkpoint_dir=None):
     import re
     print(" [*] Reading checkpoints...")
     if not config.use_default_checkpoint:
       checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
 
+    if style_net_checkpoint_dir is not None:
+      ckpt = tf.train.get_checkpoint_state(style_net_checkpoint_dir)
+      if not ckpt:
+        raise ValueError('style_net_checkpoint_dir points to wrong directory/model doesn\'t exist')
+      ckpt_name = os.path.join(style_net_checkpoint_dir, os.path.basename(ckpt.model_checkpoint_path))
+      self.style_net_saver.restore(self.sess, tf.train.latest_checkpoint(style_net_checkpoint_dir))
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
     if ckpt and ckpt.model_checkpoint_path:
       ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
@@ -832,3 +872,5 @@ class DCGAN(object):
     else:
       print(" [*] Failed to find a checkpoint")
       return False, 0
+
+

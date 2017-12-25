@@ -37,6 +37,7 @@ flags.DEFINE_string("s3_bucket", None, "the s3_bucket to upload results to")
 flags.DEFINE_boolean("replay", True, "True if using experience replay [True]")
 flags.DEFINE_boolean("use_resize", False, "True if resize conv for upsampling, False for fractionally strided conv [False]")
 flags.DEFINE_boolean("use_default_checkpoint", False, "True only if checkpoint_dir is None. Don't set this")
+flags.DEFINE_string("style_net_checkpoint", None, "The checkpoint to get style net. Leave default to note use stylenet")
 FLAGS = flags.FLAGS
 
 def main(_):
@@ -91,74 +92,80 @@ def main(_):
     os.makedirs(FLAGS.sample_dir)
   print('After processing flags')
   pp.pprint(flags.FLAGS.__flags)
+  if FLAGS.style_net_checkpoint:
+    from slim.nets import nets_factory
+    network_fn = nets_factory
 
-  run_config = tf.ConfigProto()
+
+  sess = None
+  if FLAGS.dataset == 'mnist':
+    dcgan = DCGAN(
+        sess,
+        input_width=FLAGS.input_width,
+        input_height=FLAGS.input_height,
+        output_width=FLAGS.output_width,
+        output_height=FLAGS.output_height,
+        batch_size=FLAGS.batch_size,
+        sample_num=FLAGS.sample_size,
+        use_resize=FLAGS.use_resize,
+        replay=FLAGS.replay,
+        y_dim=10,
+        smoothing=FLAGS.smoothing,
+        lamb = FLAGS.lambda_val,
+        dataset_name=FLAGS.dataset,
+        input_fname_pattern=FLAGS.input_fname_pattern,
+        crop=FLAGS.crop,
+        checkpoint_dir=FLAGS.checkpoint_dir,
+        sample_dir=FLAGS.sample_dir,
+        wgan=FLAGS.wgan,
+        can=FLAGS.can)
+  elif FLAGS.dataset == 'wikiart':
+    dcgan = DCGAN(
+        sess,
+        input_width=FLAGS.input_width,
+        input_height=FLAGS.input_height,
+        output_width=FLAGS.output_width,
+        output_height=FLAGS.output_height,
+        batch_size=FLAGS.batch_size,
+        sample_num=FLAGS.sample_size,
+        use_resize=FLAGS.use_resize,
+        replay=FLAGS.replay,
+        y_dim=27,
+        smoothing=FLAGS.smoothing,
+        lamb = FLAGS.lambda_val,
+        dataset_name=FLAGS.dataset,
+        input_fname_pattern=FLAGS.input_fname_pattern,
+        crop=FLAGS.crop,
+        checkpoint_dir=FLAGS.checkpoint_dir,
+        sample_dir=FLAGS.sample_dir,
+        wgan=FLAGS.wgan,
+        style_net_checkpoint=FLAGS.style_net_checkpoint,
+        can=FLAGS.can)
+  else:
+    dcgan = DCGAN(
+        sess,
+        input_width=FLAGS.input_width,
+        input_height=FLAGS.input_height,
+        output_width=FLAGS.output_width,
+        output_height=FLAGS.output_height,
+        batch_size=FLAGS.batch_size,
+        sample_num=FLAGS.sample_size,
+        dataset_name=FLAGS.dataset,
+        replay=FLAGS.replay,
+        input_fname_pattern=FLAGS.input_fname_pattern,
+        use_resize=FLAGS.use_resize,
+        smoothing=FLAGS.smoothing,
+        crop=FLAGS.crop,
+        lamb = FLAGS.lambda_val,
+        checkpoint_dir=FLAGS.checkpoint_dir,
+        sample_dir=FLAGS.sample_dir,
+        wgan=FLAGS.wgan,
+        can=FLAGS.can)
+
+  run_config = tf.ConfigProto(log_device_placement=True)
   run_config.gpu_options.allow_growth=True
-
   with tf.Session(config=run_config) as sess:
-    if FLAGS.dataset == 'mnist':
-      dcgan = DCGAN(
-          sess,
-          input_width=FLAGS.input_width,
-          input_height=FLAGS.input_height,
-          output_width=FLAGS.output_width,
-          output_height=FLAGS.output_height,
-          batch_size=FLAGS.batch_size,
-          sample_num=FLAGS.sample_size,
-          use_resize=FLAGS.use_resize,
-          replay=FLAGS.replay,
-          y_dim=10,
-          smoothing=FLAGS.smoothing,
-          lamb = FLAGS.lambda_val,
-          dataset_name=FLAGS.dataset,
-          input_fname_pattern=FLAGS.input_fname_pattern,
-          crop=FLAGS.crop,
-          checkpoint_dir=FLAGS.checkpoint_dir,
-          sample_dir=FLAGS.sample_dir,
-          wgan=FLAGS.wgan,
-          can=FLAGS.can)
-    elif FLAGS.dataset == 'wikiart':
-      dcgan = DCGAN(
-          sess,
-          input_width=FLAGS.input_width,
-          input_height=FLAGS.input_height,
-          output_width=FLAGS.output_width,
-          output_height=FLAGS.output_height,
-          batch_size=FLAGS.batch_size,
-          sample_num=FLAGS.sample_size,
-          use_resize=FLAGS.use_resize,
-          replay=FLAGS.replay,
-          y_dim=27,
-          smoothing=FLAGS.smoothing,
-          lamb = FLAGS.lambda_val,
-          dataset_name=FLAGS.dataset,
-          input_fname_pattern=FLAGS.input_fname_pattern,
-          crop=FLAGS.crop,
-          checkpoint_dir=FLAGS.checkpoint_dir,
-          sample_dir=FLAGS.sample_dir,
-          wgan=FLAGS.wgan,
-          can=FLAGS.can)
-    else:
-      dcgan = DCGAN(
-          sess,
-          input_width=FLAGS.input_width,
-          input_height=FLAGS.input_height,
-          output_width=FLAGS.output_width,
-          output_height=FLAGS.output_height,
-          batch_size=FLAGS.batch_size,
-          sample_num=FLAGS.sample_size,
-          dataset_name=FLAGS.dataset,
-          replay=FLAGS.replay,
-          input_fname_pattern=FLAGS.input_fname_pattern,
-          use_resize=FLAGS.use_resize,
-          smoothing=FLAGS.smoothing,
-          crop=FLAGS.crop,
-          lamb = FLAGS.lambda_val,
-          checkpoint_dir=FLAGS.checkpoint_dir,
-          sample_dir=FLAGS.sample_dir,
-          wgan=FLAGS.wgan,
-          can=FLAGS.can)
-
+    dcgan.set_sess(sess)
     show_all_variables()
 
     if FLAGS.train:
