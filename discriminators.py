@@ -134,7 +134,8 @@ def dcwgan(model, image, reuse=False):
         h2 = lrelu(layer_norm(conv2d(h1, model.df_dim*4, name='d_h2_conv')))
         h3 = lrelu(layer_norm(conv2d(h2, model.df_dim*8, name='d_h3_conv')))
         shape = np.product(h3.get_shape()[1:].as_list())
-        h4 = linear(tf.reshape(h3, [-1, shape]), 1, 'd_h4_lin')
+        reshaped = tf.reshape(h3, [-1, shape])
+        h4 = linear(reshaped, 1, 'd_h4_lin')
         return h4
 
 def dcwgan_cond(model, image, y, reuse=False):
@@ -144,10 +145,15 @@ def dcwgan_cond(model, image, y, reuse=False):
         yb = tf.reshape(y, [-1, 1, 1, model.y_dim])
         x = conv_cond_concat(image, yb)
         h0 = lrelu(conv2d(x, model.df_dim, name='d_h0_conv'))
+        h0 = conv_cond_concat(h0, yb)
         h1 = lrelu(layer_norm(conv2d(h0, model.df_dim*2, name='d_h1_conv')))
+        h1 = conv_cond_concat(h1, yb)
         h2 = lrelu(layer_norm(conv2d(h1, model.df_dim*4, name='d_h2_conv')))
+        h2 = conv_cond_concat(h2, yb)
         h3 = lrelu(layer_norm(conv2d(h2, model.df_dim*8, name='d_h3_conv')))
         shape = np.product(h3.get_shape()[1:].as_list())
-        h4 = linear(tf.reshape(h3, [-1, shape]), 1, 'd_h4_lin')
+        reshaped = tf.reshape(h3, [-1, shape])
+        cond = concat([reshaped,y],1)
+        h4 = linear(cond, 1, 'd_h4_lin')
         return h4
 

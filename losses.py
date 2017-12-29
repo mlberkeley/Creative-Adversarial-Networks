@@ -141,13 +141,8 @@ def WGAN_loss(model):
     model.g_vars = [var for var in t_vars if 'g_' in var.name]
     
     g_update = model.g_opt.minimize(model.g_loss, var_list=model.g_vars)
+    d_update = model.d_opt.minimize(model.d_loss, var_list=model.d_vars)
 
-    d_gradvar = model.d_opt.compute_gradients(
-        model.d_loss,
-        var_list=model.d_vars,
-        colocate_gradients_with_ops=True
-    )
-    d_update = model.d_opt.apply_gradients(d_gradvar)
     loss_ops = [model.d_loss, model.g_loss]
 
     model.G_sum = image_summary("G", model.G)
