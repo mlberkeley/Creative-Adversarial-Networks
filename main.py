@@ -70,11 +70,12 @@ def main(_):
     log_dir = os.path.join(log_dir, "000")
   else:
     containing_dir=os.path.join(log_dir, "*")
-    print(containing_dir)
     nums = [int(x[-3:]) for x in glob(containing_dir)] # TODO FIX THESE HACKS
-    print('nums', nums)
-    num = str(max(nums) + 1)
-    log_dir = os.path.join(log_dir,(3-len(num))*"0"+num)
+    if nums == []:
+      num = 0
+    else:
+      num = max(nums) + 1
+    log_dir = os.path.join(log_dir,"{:03d}".format(num))
   FLAGS.log_dir = log_dir
 
   if FLAGS.checkpoint_dir is None:
@@ -162,11 +163,12 @@ def main(_):
         wgan=FLAGS.wgan,
         can=FLAGS.can)
 
-  run_config = tf.ConfigProto(log_device_placement=True)
-  run_config.gpu_options.allow_growth=True
+  # run_config = tf.ConfigProto(log_device_placement=True)
+  run_config = tf.ConfigProto()
+  # run_config.gpu_options.allow_growth=True
   with tf.Session(config=run_config) as sess:
     dcgan.set_sess(sess)
-    show_all_variables()
+    # show_all_variables()
 
     if FLAGS.train:
       dcgan.train(FLAGS)
