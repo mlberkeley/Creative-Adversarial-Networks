@@ -1,15 +1,14 @@
 # trains gan with an outside can network instead of having the discriminator learn style classification
 export PYTHONPATH="slim/:$PYTHONPATH"
-export CUDA_VISIBLE_DEVICES=0
-BATCH_SIZE=16
+export CUDA_VISIBLE_DEVICES=1
 python3 main.py \
 --epoch 25 \
 --learning_rate .0001 \
 --beta 0.5 \
---batch_size $BATCH_SIZE \
---sample_size $BATCH_SIZE \
---input_height 256 \
---output_height 256 \
+--batch_size 16 \
+--sample_size 72 \
+--input_height 128 \
+--output_height 128 \
 --lambda_val 1.0 \
 --smoothing 1.0 \
 --use_resize True \
