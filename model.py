@@ -227,9 +227,9 @@ class DCGAN(object):
 
     counter = 1
     start_time = time.time()
-#    could_load, checkpoint_counter = self.load(self.checkpoint_dir)
-#    if could_load:
-#      counter = checkpoint_counter
+    could_load, checkpoint_counter = self.load(self.checkpoint_dir)
+    if could_load:
+      counter = checkpoint_counter
 #      replay_files = glob(os.path.join(self.model_dir + '_replay'))
       #self.experience_buffer =[
       #              get_image(sample_file,
@@ -239,9 +239,9 @@ class DCGAN(object):
       #              resize_width=self.output_width,
       #              crop=self.crop,
       #              grayscale=self.grayscale) for sample_file in replay_files]      
-      #print(" [*] Load SUCCESS")
-    #else:
-    #  print(" [!] Load failed...")
+      print(" [*] Load SUCCESS")
+    else:
+      print(" [!] Load failed...")
 
     for epoch in xrange(config.epoch):
       if config.dataset == 'mnist':
