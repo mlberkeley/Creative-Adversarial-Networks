@@ -20,9 +20,9 @@ class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=32, smoothing=0.9, lamb = 1.0,
-         use_resize=False, learning_rate = 1e-4, 
+         use_resize=False, replay=False, learning_rate = 1e-4,
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False, can=True,
-         input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None):
+         input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None, old_model=False):
     """
 
     Args:
@@ -80,11 +80,11 @@ class DCGAN(object):
     self.can = can
     self.wgan = wgan
     self.use_resize = use_resize
-
+    self.replay = replay
     self.input_fname_pattern = input_fname_pattern
     self.checkpoint_dir = checkpoint_dir
     self.experience_flag = False
-    
+
     if self.dataset_name == 'mnist':
       self.data_X, self.data_y = self.load_mnist()
       self.c_dim = self.data_X[0].shape[-1]
@@ -106,8 +106,8 @@ class DCGAN(object):
         self.c_dim = 1
     self.experience_buffer=[]
     self.grayscale = (self.c_dim == 1)
-    
-    self.build_model()
+
+    self.build_model(old_model=old_model)
 
   def upsample(self, input_, output_shape,
         k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
@@ -115,11 +115,12 @@ class DCGAN(object):
     if self.use_resize:
       return resizeconv(input_=input_, output_shape=output_shape,
         k_h=k_h, k_w=k_w, d_h=d_h, d_w=d_w, name=(name or "resconv"))
-   
+
     return deconv2d(input_=input_, output_shape=output_shape,
         k_h=k_h, k_w=k_w, d_h=d_h, d_w=d_w, name= (name or "deconv2d"))
 
-  def build_model(self):
+  def build_model(self, old_model=False):
+    print('build_model', old_model)
     if self.y_dim:
       self.y = tf.placeholder(tf.float32, [None, self.y_dim], name='y')
     else:
@@ -135,7 +136,6 @@ class DCGAN(object):
     self.z = tf.placeholder(
       tf.float32, [None, self.z_dim], name='z')
     self.z_sum = histogram_summary("z", self.z)
-    
     if self.wgan and not self.can:
         self.discriminator = discriminators.dcwgan_cond
         self.generator = generators.dcgan_cond
@@ -187,10 +187,16 @@ class DCGAN(object):
       print(path+(3-len(num))*"0"+num)
       self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
 
+    # TODO refactor path = self.log_dir. Waiting for merge
+    self.log_dir = config.log_dir
+
+    self.writer = SummaryWriter(self.log_dir, self.sess.graph)
+
+
     sample_z = np.random.normal(0, 1, [self.sample_num, self.z_dim]) \
               .astype(np.float32)
     sample_z /= np.linalg.norm(sample_z, axis=0)
-    
+
     if config.dataset == 'mnist':
       sample_inputs = self.data_X[0:self.sample_num]
       sample_labels = self.data_y[0:self.sample_num]
@@ -227,18 +233,19 @@ class DCGAN(object):
 
     counter = 1
     start_time = time.time()
-    could_load, checkpoint_counter = self.load(self.checkpoint_dir)
+    could_load, checkpoint_counter = self.load(self.checkpoint_dir, config)
     if could_load:
       counter = checkpoint_counter
-#      replay_files = glob(os.path.join(self.model_dir + '_replay'))
-      #self.experience_buffer =[
-      #              get_image(sample_file,
-      #              input_height=self.input_height,
-      #              input_width=self.input_width,
-      #              resize_height=self.output_height,
-      #              resize_width=self.output_width,
-      #              crop=self.crop,
-      #              grayscale=self.grayscale) for sample_file in replay_files]      
+      if self.replay:
+        replay_files = glob(os.path.join(self.model_dir + '_replay'))
+        self.experience_buffer =[
+                    get_image(sample_file,
+                    input_height=self.input_height,
+                    input_width=self.input_width,
+                    resize_height=self.output_height,
+                    resize_width=self.output_width,
+                    crop=self.crop,
+                    grayscale=self.grayscale) for sample_file in replay_files]
       print(" [*] Load SUCCESS")
     else:
       print(" [!] Load failed...")
@@ -254,7 +261,7 @@ class DCGAN(object):
 
       for idx in xrange(0, batch_idxs):
         self.experience_flag = not bool(idx % 2)
-        
+
         if config.dataset == 'mnist':
           batch_images = self.data_X[idx*config.batch_size:(idx+1)*config.batch_size]
           batch_labels = self.data_y[idx*config.batch_size:(idx+1)*config.batch_size]
@@ -273,7 +280,7 @@ class DCGAN(object):
           else:
             batch_images = np.array(batch).astype(np.float32)
           batch_labels = self.get_y(batch_files)
-          
+
         batch_z = np.random.normal(0, 1, [config.batch_size, self.z_dim]) \
               .astype(np.float32)
         batch_z /= np.linalg.norm(batch_z, axis=0)
@@ -375,19 +382,28 @@ class DCGAN(object):
             print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD, errG))
-            
           else: 
             print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD, errG))
-        #if np.mod(counter, 64) == 1:
-        #  samp_images = self.G.eval({
-        #      self.z: batch_z, 
-        #  })       
-        #  for image in enumerate(samp_images):
-        #    self.experience_buffer.append(image)
+            
+        if np.mod(counter, 5) == 1 and self.replay:
+          samp_images = self.G.eval({
+              self.z: batch_z
+          })
+          if self.experience_flag:
+            exp_path = os.path.join('buffer', self.model_dir)
+            #max_ = get_max_end(exp_path)
+            for i, image in enumerate(samp_images):
+              #scipy.misc.imsave(exp_path + '_' + str(max_+i) + '.jpg', np.squeeze(image))
+              self.experience_buffer.append(image)
+            # todo make into a flag
+            exp_buffer_len = 10000
+            if len(self.experience_buffer) > exp_buffer_len:
+              self.experience_buffer = self.experience_buffer[len(self.experience_buffer) - exp_buffer_len:]
 
-        if np.mod(counter, 350) == 1:
+        if np.mod(counter, 400) == 1:
+
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
             samples = self.sess.run(
               self.sampler,
@@ -414,8 +430,8 @@ class DCGAN(object):
             except:
               print("one pic error!...")
 
-        if np.mod(counter, 500) == 2:
-          self.save(config.checkpoint_dir, counter)
+        if np.mod(counter, config.save_itr) == 2:
+          self.save(config.checkpoint_dir, counter, config)
 
   def get_y(self, sample_inputs):
     ret = []
@@ -467,9 +483,10 @@ class DCGAN(object):
         self.dataset_name, self.batch_size,
         self.output_height, self.output_width)
 
-  def save(self, checkpoint_dir, step):
+  def save(self, checkpoint_dir, step, config):
     model_name = "DCGAN.model"
-    checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
+    if not config.use_default_checkpoint:
+      checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
 
     if not os.path.exists(checkpoint_dir):
       os.makedirs(checkpoint_dir)
@@ -478,10 +495,35 @@ class DCGAN(object):
             os.path.join(checkpoint_dir, model_name),
             global_step=step)
 
-  def load(self, checkpoint_dir):
+    if config.use_s3:
+      import aws
+      s3_dir = checkpoint_dir
+      aws.upload_path(checkpoint_dir, config.s3_bucket, s3_dir)
+      print('uploading log')
+      aws.upload_path(self.log_dir, config.s3_bucket, self.log_dir, certain_upload=True)
+
+
+  def load_specific(self, checkpoint_dir):
+    ''' like loading but takes in a directory directly'''
     import re
     print(" [*] Reading checkpoints...")
-    checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
+
+    ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+    if ckpt and ckpt.model_checkpoint_path:
+      ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+      self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
+      counter = int(next(re.finditer("(\d+)(?!.*\d)",ckpt_name)).group(0))
+      print(" [*] Success to read {}".format(ckpt_name))
+      return True, counter
+    else:
+      print(" [*] Failed to find a checkpoint")
+      return False, 0
+
+  def load(self, checkpoint_dir, config):
+    import re
+    print(" [*] Reading checkpoints...")
+    if not config.use_default_checkpoint:
+      checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
 
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
     if ckpt and ckpt.model_checkpoint_path:
