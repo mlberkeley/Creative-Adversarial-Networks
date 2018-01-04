@@ -4,8 +4,8 @@ from ops import *
 def CAN_loss(model):
     #builds optimizers and losses
 
-    model.G                  = model.generator(model.z)
-    model.D, model.D_logits, model.D_c, model.D_c_logits     = model.discriminator(
+    model.G                  = model.generator(model, model.z)
+    model.D, model.D_logits, model.D_c, model.D_c_logits     = model.discriminator(model,
                                                               model.inputs, reuse=False)
     if model.experience_flag:
       try:
@@ -14,7 +14,7 @@ def CAN_loss(model):
         model.experience_selection = tf.convert_to_tensor(model.experience_buffer)
       model.G = tf.concat([model.G, model.experience_selection], axis=0)
 
-    model.D_, model.D_logits_, model.D_c_, model.D_c_logits_ = model.discriminator(
+    model.D_, model.D_logits_, model.D_c_, model.D_c_logits_ = model.discriminator(model,
                                                               model.G, reuse=True)
     model.d_sum = histogram_summary("d", model.D)
     model.d__sum = histogram_summary("d_", model.D_)
@@ -38,11 +38,12 @@ def CAN_loss(model):
       tf.nn.softmax_cross_entropy_with_logits(logits=model.D_c_logits, labels=model.smoothing * model.y))
 
     # if classifier is set, then use the classifier, o/w use the clasification layers in the discriminator
-    if model.classifier is None:
+    if model.style_net_checkpoint is None:
       model.g_loss_class_fake = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=model.D_c_logits_,
           labels=(1.0/model.y_dim)*tf.ones_like(model.D_c_)))
     else:
+      model.classifier = model.make_style_net(model.G)
       model.g_loss_class_fake = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=model.classifier,
           labels=(1.0/model.y_dim)*tf.ones_like(model.D_c_)))

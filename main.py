@@ -10,12 +10,13 @@ import tensorflow as tf
 
 flags = tf.app.flags
 flags.DEFINE_integer("epoch", 25, "Epoch to train [25]")
-flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
+flags.DEFINE_float("learning_rate", 0.0002, "Learning rate  for adam [0.0002]")
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
 flags.DEFINE_float("smoothing", 0.9, "Smoothing term for discriminator real (class) loss [0.9]")
 flags.DEFINE_float("lambda_val", 1.0, "determines the relative importance of style ambiguity loss [1.0]")
 flags.DEFINE_integer("train_size", np.inf, "The size of train images [np.inf]")
 flags.DEFINE_integer("save_itr", 500, "The number of iterations to run for saving checkpoints")
+flags.DEFINE_integer("sample_itr", 500, "The number of iterations to run for sampling from the sampler")
 flags.DEFINE_integer("batch_size", 64, "The size of batch images [64]")
 flags.DEFINE_integer("sample_size", 64, "the size of sample images [64]")
 flags.DEFINE_integer("input_height", 108, "The size of image to use (will be center cropped). [108]")
@@ -38,6 +39,7 @@ flags.DEFINE_boolean("replay", True, "True if using experience replay [True]")
 flags.DEFINE_boolean("use_resize", False, "True if resize conv for upsampling, False for fractionally strided conv [False]")
 flags.DEFINE_boolean("use_default_checkpoint", False, "True only if checkpoint_dir is None. Don't set this")
 flags.DEFINE_string("style_net_checkpoint", None, "The checkpoint to get style net. Leave default to note use stylenet")
+flags.DEFINE_boolean("allow_gpu_growth", False, "True if you want Tensorflow only to allocate the gpu memory it requires. Good for debugging, but can impact performance")
 FLAGS = flags.FLAGS
 
 def main(_):
@@ -60,16 +62,17 @@ def main(_):
 
 
   # configure the log_dir to match the params
-  log_dir = os.path.join(FLAGS.log_dir, "dataset={},isCan={},lr={},imsize={},batch_size={}".format(
+  log_dir = os.path.join(FLAGS.log_dir, "dataset={},isCan={},lr={},imsize={},hasStyleNet={},batch_size={}".format(
                 FLAGS.dataset,
                 FLAGS.can,
                 FLAGS.learning_rate,
                 FLAGS.input_height,
+                FLAGS.style_net_checkpoint is not None,
                 FLAGS.batch_size))
   if not glob(log_dir + "*"):
     log_dir = os.path.join(log_dir, "000")
   else:
-    containing_dir=os.path.join(log_dir, "*")
+    containing_dir=os.path.join(log_dir, "[0-9][0-9][0-9]")
     nums = [int(x[-3:]) for x in glob(containing_dir)] # TODO FIX THESE HACKS
     if nums == []:
       num = 0
@@ -129,14 +132,20 @@ def main(_):
       can=FLAGS.can)
 
 
-  if FLAGS.train:
-    dcgan.train(FLAGS)
-  else:
-    if not dcgan.load(FLAGS.checkpoint_dir)[0]:
-      raise Exception("[!] Train a model first, then run test mode")
+  run_config = tf.ConfigProto()
+  run_config.gpu_options.allow_growth=FLAGS.allow_gpu_growth
+  with tf.Session(config=run_config) as sess:
+    dcgan.set_sess(sess)
+    # show_all_variables()
 
-  OPTION = 0
-  visualize(sess, dcgan, FLAGS, OPTION)
+    if FLAGS.train:
+      dcgan.train(FLAGS)
+    else:
+      if not dcgan.load(FLAGS.checkpoint_dir)[0]:
+        raise Exception("[!] Train a model first, then run test mode")
+
+    OPTION = 0
+    visualize(sess, dcgan, FLAGS, OPTION)
 
 if __name__ == '__main__':
   tf.app.run()

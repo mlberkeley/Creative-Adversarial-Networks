@@ -132,9 +132,11 @@ class DCGAN(object):
       logits, _ = network_fn(images)
       logits = tf.stop_gradient(logits)
       return logits
+  def set_sess(self, sess):
+    ''' set session to sess '''
+    self.sess = sess
 
   def build_model(self, old_model=False):
-    print('build_model', old_model)
     if self.y_dim:
       self.y = tf.placeholder(tf.float32, [None, self.y_dim], name='y')
     else:
@@ -159,13 +161,11 @@ class DCGAN(object):
     if self.wgan and self.can:
         self.discriminator = discriminators.vanilla_wgan
         self.generator = generators.vanilla_wgan
-        self.classifier = self.make_style_net(self.inputs) if self.style_net_checkpoint else None
         #TODO: write all this wcan stuff
         self.d_update, self.g_update, self.losses, self.sums = WCAN_loss(self)
     if not self.wgan and self.can:
         self.discriminator = discriminators.vanilla_can
         self.generator = generators.vanilla_can
-        self.classifier = self.make_style_net(self.inputs) if self.style_net_checkpoint else None
         self.d_update, self.g_update, self.losses, self.sums = CAN_loss(self)
     elif not self.wgan and not self.can:
         #TODO: write the regular gan stuff
@@ -176,32 +176,24 @@ class DCGAN(object):
     else:
         self.sampler            = self.generator(self, self.z, self.y, is_sampler=True)
 
-    self.saver = tf.train.Saver()
-
+    t_vars = tf.trainable_variables()
+    self.d_vars = [var for var in t_vars if 'd_' in var.name]
+    self.g_vars = [var for var in t_vars if 'g_' in var.name]
+    if self.style_net_checkpoint:
+      all_vars = tf.trainable_variables()
+      style_net_vars = [v for v in all_vars if 'InceptionResnetV2' in v.name]
+      other_vars = [v for v in all_vars if 'InceptionResnetV2' not in v.name]
+      self.saver = tf.train.Saver(var_list=other_vars)
+      self.style_net_saver = tf.train.Saver(var_list=style_net_vars)
+    else:
+      self.saver=tf.train.Saver()
   def train(self, config):
-    #self.{g,d}_opt are created in the loss functions.
     try:
       tf.global_variables_initializer().run()
     except:
       tf.initialize_all_variables().run()
 
-    path = os.path.join('logs', "dataset={},isCan={},lr={},imsize={},batch_size={}".format(config.dataset,
-                                                                                        self.can,
-                                                                                        config.learning_rate,
-                                                                                        self.input_height,
-                                                                                        self.batch_size))
 
-    if not glob(path + "*"):
-      path = path + "000"
-      print(path)
-      self.writer = SummaryWriter(path, self.sess.graph)
-    else:
-      nums = [int(x[-3:]) for x in glob(path+"*")]
-      num = str(max(nums) + 1)
-      print(path+(3-len(num))*"0"+num)
-      self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
-
-    # TODO refactor path = self.log_dir. Waiting for merge
     self.log_dir = config.log_dir
 
     self.writer = SummaryWriter(self.log_dir, self.sess.graph)
@@ -422,9 +414,8 @@ class DCGAN(object):
             if len(self.experience_buffer) > exp_buffer_len:
               self.experience_buffer = self.experience_buffer[len(self.experience_buffer) - exp_buffer_len:]
 
-				# TODO make sample rate a flag
 
-        if np.mod(counter, 400) == 1:
+        if np.mod(counter, config.sample_itr) == 1:
 
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
             samples = self.sess.run(
@@ -561,8 +552,14 @@ class DCGAN(object):
         return os.path.normpath(os.path.join(path, os.pardir))
       path = get_parent_path(get_parent_path( checkpoint_dir))
       #find the high checkpoint path in a path
-      last_ = sorted(os.listdir(path))[-2]
-      checkpoint_dir  = os.path.join(path, last_, 'checkpoint')
+      files_in_path = sorted(os.listdir(path))
+
+      if len(files_in_path) > 1:
+        last_ = files_in_path[-2]
+
+        checkpoint_dir  = os.path.join(path, last_, 'checkpoint')
+      else:
+        checkpoint = None
 
 
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
@@ -573,7 +570,7 @@ class DCGAN(object):
       print(" [*] Success to read {}".format(ckpt_name))
       if os.path.exists(os.path.join(checkpoint_dir, 'sample_z.npy')):
         print(" [*] Success to read sample_z in {}".format(ckpt_name))
-        sample_z = np.load('sample_z.npy')
+        sample_z = np.load(os.path.join(checkpoint_dir, 'sample_z.npy'))
       else:
         print(" [*] Failed to find a sample_z")
         sample_z = None
