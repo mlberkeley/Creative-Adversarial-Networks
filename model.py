@@ -1,26 +1,26 @@
 from __future__ import division
 import os
 import time
-import math
-import random
 from glob import glob
 import tensorflow as tf
 import numpy as np
 from six.moves import xrange
 from random import shuffle
-from operator import mul
+
+from slim.nets import nets_factory
 import generators
 import discriminators
 
 from ops import *
 from utils import *
-from losses import * 
+from losses import *
 
 class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
          batch_size=64, sample_num = 64, output_height=64, output_width=64,
          y_dim=None, z_dim=100, gf_dim=64, df_dim=32, smoothing=0.9, lamb = 1.0,
-         use_resize=False, replay=False, learning_rate = 1e-4,
+
+         use_resize=False, replay=False, learning_rate = 1e-4, style_net_checkpoint=None,
          gfc_dim=1024, dfc_dim=1024, c_dim=3, dataset_name='default',wgan=False, can=True,
          input_fname_pattern='*.jpg', checkpoint_dir=None, sample_dir=None, old_model=False):
     """
@@ -48,8 +48,8 @@ class DCGAN(object):
     self.output_height = output_height
     self.output_width = output_width
     self.learning_rate = learning_rate
-    
-    
+
+
     self.y_dim = y_dim
     self.z_dim = z_dim
 
@@ -73,6 +73,9 @@ class DCGAN(object):
     self.g_bn3 = batch_norm(name='g_bn3')
     self.g_bn4 = batch_norm(name='g_bn4')
     self.g_bn5 = batch_norm(name='g_bn5')
+
+    # variables that determines whether to use style net separate from discriminator
+    self.style_net_checkpoint = style_net_checkpoint
 
     self.smoothing = smoothing
     self.lamb = lamb
@@ -118,9 +121,22 @@ class DCGAN(object):
 
     return deconv2d(input_=input_, output_shape=output_shape,
         k_h=k_h, k_w=k_w, d_h=d_h, d_w=d_w, name= (name or "deconv2d"))
+  def make_style_net(self, images):
+    with tf.device("/gpu:0"):
+      network_fn = nets_factory.get_network_fn(
+          'inception_resnet_v2',
+          num_classes=27,
+          is_training=False)
+      if images.shape[1:3] != (256, 256):
+        images = tf.image.resize_images(images, [256, 256])
+      logits, _ = network_fn(images)
+      logits = tf.stop_gradient(logits)
+      return logits
+  def set_sess(self, sess):
+    ''' set session to sess '''
+    self.sess = sess
 
   def build_model(self, old_model=False):
-    print('build_model', old_model)
     if self.y_dim:
       self.y = tf.placeholder(tf.float32, [None, self.y_dim], name='y')
     else:
@@ -136,15 +152,15 @@ class DCGAN(object):
     self.z = tf.placeholder(
       tf.float32, [None, self.z_dim], name='z')
     self.z_sum = histogram_summary("z", self.z)
+
     if self.wgan and not self.can:
         self.discriminator = discriminators.dcwgan_cond
         self.generator = generators.dcgan_cond
         self.d_update, self.g_update, self.losses, self.sums = WGAN_loss(self)
-        
+
     if self.wgan and self.can:
         self.discriminator = discriminators.vanilla_wgan
         self.generator = generators.vanilla_wgan
-        self.classifier = None
         #TODO: write all this wcan stuff
         self.d_update, self.g_update, self.losses, self.sums = WCAN_loss(self)
     if not self.wgan and self.can:
@@ -152,7 +168,7 @@ class DCGAN(object):
         self.generator = generators.vanilla_can
         self.d_update, self.g_update, self.losses, self.sums = CAN_loss(self)
     elif not self.wgan and not self.can:
-        #TODO: write the regular gan stuff 
+        #TODO: write the regular gan stuff
         self.d_update, self.g_update, self.losses, self.sums = GAN_loss(self)
 
     if self.can or not self.y_dim:
@@ -160,34 +176,24 @@ class DCGAN(object):
     else:
         self.sampler            = self.generator(self, self.z, self.y, is_sampler=True)
 
-    self.saver = tf.train.Saver()
-    
+    t_vars = tf.trainable_variables()
+    self.d_vars = [var for var in t_vars if 'd_' in var.name]
+    self.g_vars = [var for var in t_vars if 'g_' in var.name]
+    if self.style_net_checkpoint:
+      all_vars = tf.trainable_variables()
+      style_net_vars = [v for v in all_vars if 'InceptionResnetV2' in v.name]
+      other_vars = [v for v in all_vars if 'InceptionResnetV2' not in v.name]
+      self.saver = tf.train.Saver(var_list=other_vars)
+      self.style_net_saver = tf.train.Saver(var_list=style_net_vars)
+    else:
+      self.saver=tf.train.Saver()
   def train(self, config):
-    #self.{g,d}_opt are created in the loss functions.
-
-    
     try:
       tf.global_variables_initializer().run()
     except:
       tf.initialize_all_variables().run()
 
-    path = os.path.join('logs', "dataset={},isCan={},lr={},imsize={},batch_size={}".format(config.dataset,
-                                                                                        self.can,
-                                                                                        config.learning_rate,
-                                                                                        self.input_height,
-                                                                                        self.batch_size))
 
-    if not glob(path + "*"):
-      path = path + "000"
-      print(path)
-      self.writer = SummaryWriter(path, self.sess.graph)
-    else:
-      nums = [int(x[-3:]) for x in glob(path+"*")]
-      num = str(max(nums) + 1)
-      print(path+(3-len(num))*"0"+num)
-      self.writer = SummaryWriter(path+(3-len(num))*"0"+num, self.sess.graph)
-
-    # TODO refactor path = self.log_dir. Waiting for merge
     self.log_dir = config.log_dir
 
     self.writer = SummaryWriter(self.log_dir, self.sess.graph)
@@ -233,7 +239,9 @@ class DCGAN(object):
 
     counter = 1
     start_time = time.time()
-    could_load, checkpoint_counter = self.load(self.checkpoint_dir, config)
+    could_load, checkpoint_counter, loaded_sample_z = self.load(self.checkpoint_dir,
+        config,
+        style_net_checkpoint_dir=self.style_net_checkpoint)
     if could_load:
       counter = checkpoint_counter
       if self.replay:
@@ -247,9 +255,12 @@ class DCGAN(object):
                     crop=self.crop,
                     grayscale=self.grayscale) for sample_file in replay_files]
       print(" [*] Load SUCCESS")
+      if loaded_sample_z is not None:
+        sample_z = loaded_sample_z
     else:
       print(" [!] Load failed...")
 
+    np.save(os.path.join(self.checkpoint_dir, 'sample_z'), sample_z)
     for epoch in xrange(config.epoch):
       if config.dataset == 'mnist':
         batch_idxs = min(len(self.data_X), config.train_size) // config.batch_size
@@ -287,7 +298,7 @@ class DCGAN(object):
 
         if self.can:
         #update D
-        
+
           _, summary_str = self.sess.run([self.d_update, self.sums[0]],
             feed_dict={
               self.inputs: batch_images,
@@ -299,6 +310,7 @@ class DCGAN(object):
           _, summary_str = self.sess.run([self.g_update, self.sums[1]],
             feed_dict={
               self.z: batch_z,
+
             })
           self.writer.add_summary(summary_str, counter)
           #do we need self.y for these two?
@@ -338,12 +350,12 @@ class DCGAN(object):
               })
               self.writer.add_summary(summary_str, counter)
               slopes = self.sess.run(self.slopes,
-            
+
                 feed_dict={
                   self.inputs: batch_images,
                   self.z: batch_z,
-                  self.y: batch_labels   
-              
+                  self.y: batch_labels
+
               })
           _, summary_str = self.sess.run([self.d_update, self.d_sum],
             feed_dict={
@@ -360,7 +372,7 @@ class DCGAN(object):
               self.y: batch_labels,
             })
           self.writer.add_summary(summary_str, counter)
-          
+
           errD = self.d_loss.eval({
               self.inputs: batch_images,
               self.y:batch_labels,
@@ -382,11 +394,11 @@ class DCGAN(object):
             print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD, errG))
-          else: 
+          else:
             print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD, errG))
-            
+
         if np.mod(counter, 5) == 1 and self.replay:
           samp_images = self.G.eval({
               self.z: batch_z
@@ -402,7 +414,8 @@ class DCGAN(object):
             if len(self.experience_buffer) > exp_buffer_len:
               self.experience_buffer = self.experience_buffer[len(self.experience_buffer) - exp_buffer_len:]
 
-        if np.mod(counter, 400) == 1:
+
+        if np.mod(counter, config.sample_itr) == 1:
 
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
             samples = self.sess.run(
@@ -432,6 +445,7 @@ class DCGAN(object):
 
         if np.mod(counter, config.save_itr) == 2:
           self.save(config.checkpoint_dir, counter, config)
+
 
   def get_y(self, sample_inputs):
     ret = []
@@ -519,11 +533,34 @@ class DCGAN(object):
       print(" [*] Failed to find a checkpoint")
       return False, 0
 
-  def load(self, checkpoint_dir, config):
+  def load(self, checkpoint_dir, config, style_net_checkpoint_dir=None, use_last_checkpoint=True):
     import re
     print(" [*] Reading checkpoints...")
     if not config.use_default_checkpoint:
       checkpoint_dir = os.path.join(checkpoint_dir, self.model_dir)
+
+    if style_net_checkpoint_dir is not None:
+      ckpt = tf.train.get_checkpoint_state(style_net_checkpoint_dir)
+      if not ckpt:
+        raise ValueError('style_net_checkpoint_dir points to wrong directory/model doesn\'t exist')
+      ckpt_name = os.path.join(style_net_checkpoint_dir, os.path.basename(ckpt.model_checkpoint_path))
+      self.style_net_saver.restore(self.sess, tf.train.latest_checkpoint(style_net_checkpoint_dir))
+
+    # finds teh checkpoint
+    if config.use_default_checkpoint and use_last_checkpoint:
+      def get_parent_path(path):
+        return os.path.normpath(os.path.join(path, os.pardir))
+      path = get_parent_path(get_parent_path( checkpoint_dir))
+      #find the high checkpoint path in a path
+      files_in_path = sorted(os.listdir(path))
+
+      if len(files_in_path) > 1:
+        last_ = files_in_path[-2]
+
+        checkpoint_dir  = os.path.join(path, last_, 'checkpoint')
+      else:
+        checkpoint = None
+
 
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
     if ckpt and ckpt.model_checkpoint_path:
@@ -531,7 +568,15 @@ class DCGAN(object):
       self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
       counter = int(next(re.finditer("(\d+)(?!.*\d)",ckpt_name)).group(0))
       print(" [*] Success to read {}".format(ckpt_name))
-      return True, counter
+      if os.path.exists(os.path.join(checkpoint_dir, 'sample_z.npy')):
+        print(" [*] Success to read sample_z in {}".format(ckpt_name))
+        sample_z = np.load(os.path.join(checkpoint_dir, 'sample_z.npy'))
+      else:
+        print(" [*] Failed to find a sample_z")
+        sample_z = None
+      return True, counter, sample_z
     else:
       print(" [*] Failed to find a checkpoint")
-      return False, 0
+      return False, 0, None
+
+

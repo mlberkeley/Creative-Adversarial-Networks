@@ -4,8 +4,8 @@ from ops import *
 def CAN_loss(model):
     #builds optimizers and losses
 
-    model.G                  = model.generator(model.z)
-    model.D, model.D_logits, model.D_c, model.D_c_logits     = model.discriminator(
+    model.G                  = model.generator(model, model.z)
+    model.D, model.D_logits, model.D_c, model.D_c_logits     = model.discriminator(model,
                                                               model.inputs, reuse=False)
     if model.experience_flag:
       try:
@@ -14,7 +14,7 @@ def CAN_loss(model):
         model.experience_selection = tf.convert_to_tensor(model.experience_buffer)
       model.G = tf.concat([model.G, model.experience_selection], axis=0)
 
-    model.D_, model.D_logits_, model.D_c_, model.D_c_logits_ = model.discriminator(
+    model.D_, model.D_logits_, model.D_c_, model.D_c_logits_ = model.discriminator(model,
                                                               model.G, reuse=True)
     model.d_sum = histogram_summary("d", model.D)
     model.d__sum = histogram_summary("d_", model.D_)
@@ -36,9 +36,17 @@ def CAN_loss(model):
 
     model.d_loss_class_real = tf.reduce_mean(
       tf.nn.softmax_cross_entropy_with_logits(logits=model.D_c_logits, labels=model.smoothing * model.y))
-    model.g_loss_class_fake = tf.reduce_mean(
-      tf.nn.softmax_cross_entropy_with_logits(logits=model.D_c_logits_,
-        labels=(1.0/model.y_dim)*tf.ones_like(model.D_c_)))
+
+    # if classifier is set, then use the classifier, o/w use the clasification layers in the discriminator
+    if model.style_net_checkpoint is None:
+      model.g_loss_class_fake = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(logits=model.D_c_logits_,
+          labels=(1.0/model.y_dim)*tf.ones_like(model.D_c_)))
+    else:
+      model.classifier = model.make_style_net(model.G)
+      model.g_loss_class_fake = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(logits=model.classifier,
+          labels=(1.0/model.y_dim)*tf.ones_like(model.D_c_)))
 
     model.g_loss_fake = -tf.reduce_mean(tf.log(model.D_))
 
@@ -139,7 +147,7 @@ def WGAN_loss(model):
     t_vars = tf.trainable_variables()
     model.d_vars = [var for var in t_vars if 'd_' in var.name]
     model.g_vars = [var for var in t_vars if 'g_' in var.name]
-    
+
     g_update = model.g_opt.minimize(model.g_loss, var_list=model.g_vars)
     d_update = model.d_opt.minimize(model.d_loss, var_list=model.d_vars)
 

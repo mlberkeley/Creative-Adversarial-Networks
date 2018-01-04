@@ -10,12 +10,13 @@ import tensorflow as tf
 
 flags = tf.app.flags
 flags.DEFINE_integer("epoch", 25, "Epoch to train [25]")
-flags.DEFINE_float("learning_rate", 0.0002, "Learning rate of for adam [0.0002]")
+flags.DEFINE_float("learning_rate", 0.0002, "Learning rate  for adam [0.0002]")
 flags.DEFINE_float("beta1", 0.5, "Momentum term of adam [0.5]")
 flags.DEFINE_float("smoothing", 0.9, "Smoothing term for discriminator real (class) loss [0.9]")
 flags.DEFINE_float("lambda_val", 1.0, "determines the relative importance of style ambiguity loss [1.0]")
 flags.DEFINE_integer("train_size", np.inf, "The size of train images [np.inf]")
 flags.DEFINE_integer("save_itr", 500, "The number of iterations to run for saving checkpoints")
+flags.DEFINE_integer("sample_itr", 500, "The number of iterations to run for sampling from the sampler")
 flags.DEFINE_integer("batch_size", 64, "The size of batch images [64]")
 flags.DEFINE_integer("sample_size", 64, "the size of sample images [64]")
 flags.DEFINE_integer("input_height", 108, "The size of image to use (will be center cropped). [108]")
@@ -37,6 +38,8 @@ flags.DEFINE_string("s3_bucket", None, "the s3_bucket to upload results to")
 flags.DEFINE_boolean("replay", True, "True if using experience replay [True]")
 flags.DEFINE_boolean("use_resize", False, "True if resize conv for upsampling, False for fractionally strided conv [False]")
 flags.DEFINE_boolean("use_default_checkpoint", False, "True only if checkpoint_dir is None. Don't set this")
+flags.DEFINE_string("style_net_checkpoint", None, "The checkpoint to get style net. Leave default to note use stylenet")
+flags.DEFINE_boolean("allow_gpu_growth", False, "True if you want Tensorflow only to allocate the gpu memory it requires. Good for debugging, but can impact performance")
 FLAGS = flags.FLAGS
 
 def main(_):
@@ -59,21 +62,23 @@ def main(_):
 
 
   # configure the log_dir to match the params
-  log_dir = os.path.join(FLAGS.log_dir, "dataset={},isCan={},lr={},imsize={},batch_size={}".format(
+  log_dir = os.path.join(FLAGS.log_dir, "dataset={},isCan={},lr={},imsize={},hasStyleNet={},batch_size={}".format(
                 FLAGS.dataset,
                 FLAGS.can,
                 FLAGS.learning_rate,
                 FLAGS.input_height,
+                FLAGS.style_net_checkpoint is not None,
                 FLAGS.batch_size))
   if not glob(log_dir + "*"):
     log_dir = os.path.join(log_dir, "000")
   else:
-    containing_dir=os.path.join(log_dir, "*")
-    print(containing_dir)
+    containing_dir=os.path.join(log_dir, "[0-9][0-9][0-9]")
     nums = [int(x[-3:]) for x in glob(containing_dir)] # TODO FIX THESE HACKS
-    print('nums', nums)
-    num = str(max(nums) + 1)
-    log_dir = os.path.join(log_dir,(3-len(num))*"0"+num)
+    if nums == []:
+      num = 0
+    else:
+      num = max(nums) + 1
+    log_dir = os.path.join(log_dir,"{:03d}".format(num))
   FLAGS.log_dir = log_dir
 
   if FLAGS.checkpoint_dir is None:
@@ -91,78 +96,47 @@ def main(_):
     os.makedirs(FLAGS.sample_dir)
   print('After processing flags')
   pp.pprint(flags.FLAGS.__flags)
+  if FLAGS.style_net_checkpoint:
+    from slim.nets import nets_factory
+    network_fn = nets_factory
+
+
+  sess = None
+  if FLAGS.dataset == 'mnist':
+    y_dim = 10
+  elif FLAGS.dataset == 'wikiart':
+    y_dim = 27
+  else:
+    y_dim = None
+  dcgan = DCGAN(
+      sess,
+      input_width=FLAGS.input_width,
+      input_height=FLAGS.input_height,
+      output_width=FLAGS.output_width,
+      output_height=FLAGS.output_height,
+      batch_size=FLAGS.batch_size,
+      sample_num=FLAGS.sample_size,
+      use_resize=FLAGS.use_resize,
+      replay=FLAGS.replay,
+      y_dim=y_dim,
+      smoothing=FLAGS.smoothing,
+      lamb = FLAGS.lambda_val,
+      dataset_name=FLAGS.dataset,
+      input_fname_pattern=FLAGS.input_fname_pattern,
+      crop=FLAGS.crop,
+      checkpoint_dir=FLAGS.checkpoint_dir,
+      sample_dir=FLAGS.sample_dir,
+      wgan=FLAGS.wgan,
+      learning_rate = FLAGS.learning_rate,
+      style_net_checkpoint=FLAGS.style_net_checkpoint,
+      can=FLAGS.can)
+
 
   run_config = tf.ConfigProto()
-  run_config.gpu_options.allow_growth=True
-
+  run_config.gpu_options.allow_growth=FLAGS.allow_gpu_growth
   with tf.Session(config=run_config) as sess:
-    if FLAGS.dataset == 'mnist':
-      dcgan = DCGAN(
-          sess,
-          input_width=FLAGS.input_width,
-          input_height=FLAGS.input_height,
-          output_width=FLAGS.output_width,
-          output_height=FLAGS.output_height,
-          batch_size=FLAGS.batch_size,
-          sample_num=FLAGS.sample_size,
-          use_resize=FLAGS.use_resize,
-          replay=FLAGS.replay,
-          y_dim=10,
-          learning_rate = FLAGS.learning_rate,
-          smoothing=FLAGS.smoothing,
-          lamb = FLAGS.lambda_val,
-          dataset_name=FLAGS.dataset,
-          input_fname_pattern=FLAGS.input_fname_pattern,
-          crop=FLAGS.crop,
-          checkpoint_dir=FLAGS.checkpoint_dir,
-          sample_dir=FLAGS.sample_dir,
-          wgan=FLAGS.wgan,
-          can=FLAGS.can)
-    elif FLAGS.dataset == 'wikiart':
-      dcgan = DCGAN(
-          sess,
-          input_width=FLAGS.input_width,
-          input_height=FLAGS.input_height,
-          output_width=FLAGS.output_width,
-          output_height=FLAGS.output_height,
-          batch_size=FLAGS.batch_size,
-          sample_num=FLAGS.sample_size,
-          use_resize=FLAGS.use_resize,
-          replay=FLAGS.replay,
-          y_dim=27,
-          learning_rate = FLAGS.learning_rate,
-          smoothing=FLAGS.smoothing,
-          lamb = FLAGS.lambda_val,
-          dataset_name=FLAGS.dataset,
-          input_fname_pattern=FLAGS.input_fname_pattern,
-          crop=FLAGS.crop,
-          checkpoint_dir=FLAGS.checkpoint_dir,
-          sample_dir=FLAGS.sample_dir,
-          wgan=FLAGS.wgan,
-          can=FLAGS.can)
-    else:
-      dcgan = DCGAN(
-          sess,
-          input_width=FLAGS.input_width,
-          input_height=FLAGS.input_height,
-          output_width=FLAGS.output_width,
-          output_height=FLAGS.output_height,
-          batch_size=FLAGS.batch_size,
-          sample_num=FLAGS.sample_size,
-          dataset_name=FLAGS.dataset,
-          replay=FLAGS.replay,
-          input_fname_pattern=FLAGS.input_fname_pattern,
-          use_resize=FLAGS.use_resize,
-          smoothing=FLAGS.smoothing,
-          learning_rate = FLAGS.learning_rate,
-          crop=FLAGS.crop,
-          lamb = FLAGS.lambda_val,
-          checkpoint_dir=FLAGS.checkpoint_dir,
-          sample_dir=FLAGS.sample_dir,
-          wgan=FLAGS.wgan,
-          can=FLAGS.can)
-
-    show_all_variables()
+    dcgan.set_sess(sess)
+    # show_all_variables()
 
     if FLAGS.train:
       dcgan.train(FLAGS)
