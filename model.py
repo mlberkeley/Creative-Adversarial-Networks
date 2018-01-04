@@ -1,14 +1,11 @@
 from __future__ import division
 import os
 import time
-import math
-import random
 from glob import glob
 import tensorflow as tf
 import numpy as np
 from six.moves import xrange
 from random import shuffle
-from operator import mul
 
 from slim.nets import nets_factory
 import generators
@@ -16,7 +13,7 @@ import discriminators
 
 from ops import *
 from utils import *
-from losses import * 
+from losses import *
 
 class DCGAN(object):
   def __init__(self, sess, input_height=108, input_width=108, crop=True,
@@ -51,8 +48,8 @@ class DCGAN(object):
     self.output_height = output_height
     self.output_width = output_width
     self.learning_rate = learning_rate
-    
-    
+
+
     self.y_dim = y_dim
     self.z_dim = z_dim
 
@@ -158,19 +155,20 @@ class DCGAN(object):
         self.discriminator = discriminators.dcwgan_cond
         self.generator = generators.dcgan_cond
         self.d_update, self.g_update, self.losses, self.sums = WGAN_loss(self)
-        
+
     if self.wgan and self.can:
         self.discriminator = discriminators.vanilla_wgan
         self.generator = generators.vanilla_wgan
-        self.classifier = None
+        self.classifier = self.make_style_net(self.inputs) if self.style_net_checkpoint else None
         #TODO: write all this wcan stuff
         self.d_update, self.g_update, self.losses, self.sums = WCAN_loss(self)
     if not self.wgan and self.can:
         self.discriminator = discriminators.vanilla_can
         self.generator = generators.vanilla_can
+        self.classifier = self.make_style_net(self.inputs) if self.style_net_checkpoint else None
         self.d_update, self.g_update, self.losses, self.sums = CAN_loss(self)
     elif not self.wgan and not self.can:
-        #TODO: write the regular gan stuff 
+        #TODO: write the regular gan stuff
         self.d_update, self.g_update, self.losses, self.sums = GAN_loss(self)
 
     if self.can or not self.y_dim:
@@ -179,7 +177,7 @@ class DCGAN(object):
         self.sampler            = self.generator(self, self.z, self.y, is_sampler=True)
 
     self.saver = tf.train.Saver()
-    
+
   def train(self, config):
     #self.{g,d}_opt are created in the loss functions.
     try:
@@ -308,7 +306,7 @@ class DCGAN(object):
 
         if self.can:
         #update D
-        
+
           _, summary_str = self.sess.run([self.d_update, self.sums[0]],
             feed_dict={
               self.inputs: batch_images,
@@ -360,12 +358,12 @@ class DCGAN(object):
               })
               self.writer.add_summary(summary_str, counter)
               slopes = self.sess.run(self.slopes,
-            
+
                 feed_dict={
                   self.inputs: batch_images,
                   self.z: batch_z,
-                  self.y: batch_labels   
-              
+                  self.y: batch_labels
+
               })
           _, summary_str = self.sess.run([self.d_update, self.d_sum],
             feed_dict={
@@ -382,7 +380,7 @@ class DCGAN(object):
               self.y: batch_labels,
             })
           self.writer.add_summary(summary_str, counter)
-          
+
           errD = self.d_loss.eval({
               self.inputs: batch_images,
               self.y:batch_labels,
@@ -404,11 +402,11 @@ class DCGAN(object):
             print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD, errG))
-          else: 
+          else:
             print("Epoch: [%2d] [%4d/%4d] time: %4.4f, d_loss: %.8f, g_loss: %.8f" \
             % (epoch, idx, batch_idxs,
               time.time() - start_time, errD, errG))
-            
+
         if np.mod(counter, 5) == 1 and self.replay:
           samp_images = self.G.eval({
               self.z: batch_z

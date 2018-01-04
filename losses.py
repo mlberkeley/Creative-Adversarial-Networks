@@ -36,9 +36,16 @@ def CAN_loss(model):
 
     model.d_loss_class_real = tf.reduce_mean(
       tf.nn.softmax_cross_entropy_with_logits(logits=model.D_c_logits, labels=model.smoothing * model.y))
-    model.g_loss_class_fake = tf.reduce_mean(
-      tf.nn.softmax_cross_entropy_with_logits(logits=model.D_c_logits_,
-        labels=(1.0/model.y_dim)*tf.ones_like(model.D_c_)))
+
+    # if classifier is set, then use the classifier, o/w use the clasification layers in the discriminator
+    if model.classifier is None:
+      model.g_loss_class_fake = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(logits=model.D_c_logits_,
+          labels=(1.0/model.y_dim)*tf.ones_like(model.D_c_)))
+    else:
+      model.g_loss_class_fake = tf.reduce_mean(
+        tf.nn.softmax_cross_entropy_with_logits(logits=model.classifier,
+          labels=(1.0/model.y_dim)*tf.ones_like(model.D_c_)))
 
     model.g_loss_fake = -tf.reduce_mean(tf.log(model.D_))
 
@@ -139,7 +146,7 @@ def WGAN_loss(model):
     t_vars = tf.trainable_variables()
     model.d_vars = [var for var in t_vars if 'd_' in var.name]
     model.g_vars = [var for var in t_vars if 'g_' in var.name]
-    
+
     g_update = model.g_opt.minimize(model.g_loss, var_list=model.g_vars)
     d_update = model.d_opt.minimize(model.d_loss, var_list=model.d_vars)
 
