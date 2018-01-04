@@ -127,16 +127,16 @@ def main(_):
       learning_rate = FLAGS.learning_rate,
       style_net_checkpoint=FLAGS.style_net_checkpoint,
       can=FLAGS.can)
-  
 
-    if FLAGS.train:
-      dcgan.train(FLAGS)
-    else:
-      if not dcgan.load(FLAGS.checkpoint_dir)[0]:
-        raise Exception("[!] Train a model first, then run test mode")
 
-    OPTION = 0
-    visualize(sess, dcgan, FLAGS, OPTION)
+  if FLAGS.train:
+    dcgan.train(FLAGS)
+  else:
+    if not dcgan.load(FLAGS.checkpoint_dir)[0]:
+      raise Exception("[!] Train a model first, then run test mode")
+
+  OPTION = 0
+  visualize(sess, dcgan, FLAGS, OPTION)
 
 if __name__ == '__main__':
   tf.app.run()
