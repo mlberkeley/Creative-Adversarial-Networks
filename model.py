@@ -130,7 +130,6 @@ class DCGAN(object):
           num_classes=27,
           is_training=False)
       if images.shape[1:3] != (256, 256):
-        # TODO check that the if statement works when the image shape is actually 256, 256
         images = tf.image.resize_images(images, [256, 256])
       logits, _ = network_fn(images)
       logits = tf.stop_gradient(logits)
@@ -205,18 +204,20 @@ class DCGAN(object):
       self.d_loss_class_real = tf.reduce_mean(
         tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits, labels=self.smoothing * self.y))
       if self.style_net_checkpoint:
+        print('making g_loss_class_fake')
         self.g_loss_class_fake = tf.reduce_mean(
           tf.nn.softmax_cross_entropy_with_logits(logits=self.style_net,
             labels=(1.0/self.y_dim)*tf.ones_like(self.style_net)))
       else:
         self.g_loss_class_fake = tf.reduce_mean(
-          tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits,
-            labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
+					tf.nn.softmax_cross_entropy_with_logits(logits=self.D_c_logits_,
+						labels=(1.0/self.y_dim)*tf.ones_like(self.D_c_)))
+
 
       self.g_loss_fake = -tf.reduce_mean(tf.log(self.D_))
 
       self.d_loss = self.d_loss_real + self.d_loss_class_real + self.d_loss_fake
-      self.g_loss = self.g_loss_fake + self.lamb * self.g_loss_class_fake
+      self.g_loss = self.g_loss_fake  + self.lamb * self.g_loss_class_fake
 
       self.d_loss_real_sum       = scalar_summary("d_loss_real", self.d_loss_real)
       self.d_loss_fake_sum       = scalar_summary("d_loss_fake", self.d_loss_fake)
@@ -332,7 +333,7 @@ class DCGAN(object):
 
     counter = 1
     start_time = time.time()
-    could_load, checkpoint_counter = self.load(self.checkpoint_dir,
+    could_load, checkpoint_counter, loaded_sample_z = self.load(self.checkpoint_dir,
         config,
         style_net_checkpoint_dir=self.style_net_checkpoint)
     if could_load:
@@ -347,9 +348,12 @@ class DCGAN(object):
                     crop=self.crop,
                     grayscale=self.grayscale) for sample_file in replay_files]
       print(" [*] Load SUCCESS")
+      if loaded_sample_z is not None:
+        sample_z = loaded_sample_z
     else:
       print(" [!] Load failed...")
 
+    np.save(os.path.join(self.checkpoint_dir, 'sample_z'), sample_z)
     for epoch in xrange(config.epoch):
       if config.dataset == 'mnist':
         batch_idxs = min(len(self.data_X), config.train_size) // config.batch_size
@@ -398,6 +402,7 @@ class DCGAN(object):
           _, summary_str = self.sess.run([g_optim, self.g_sum],
             feed_dict={
               self.z: batch_z,
+
             })
           self.writer.add_summary(summary_str, counter)
           #do we need self.y for these two?
@@ -485,6 +490,8 @@ class DCGAN(object):
             exp_buffer_len = 10000
             if len(self.experience_buffer) > exp_buffer_len:
               self.experience_buffer = self.experience_buffer[len(self.experience_buffer) - exp_buffer_len:]
+
+				# TODO make sample rate a flag
 
         if np.mod(counter, 400) == 1:
           if config.dataset == 'mnist' or config.dataset == 'wikiart':
@@ -684,85 +691,87 @@ class DCGAN(object):
             h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
         return tf.nn.tanh(h6)
   def sampler(self, z, y=None):
-    with tf.variable_scope("generator") as scope:
-      scope.reuse_variables()
-      if self.can:
-        s_h, s_w = self.output_height, self.output_width #256/256
-        s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
-        s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
-        s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
-        s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
-        s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
-        s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
+    # with tf.device("/gpu:1"):
+    with tf.device("/gpu:0"):
+      with tf.variable_scope("generator") as scope:
+        scope.reuse_variables()
+        if self.can:
+          s_h, s_w = self.output_height, self.output_width #256/256
+          s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
+          s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
+          s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
+          s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
+          s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
+          s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
 
-        # project `z` and reshape
-        z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
+          # project `z` and reshape
+          z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
 
-        h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
-        h0 = lrelu(self.g_bn0(h0, train=False))
+          h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
+          h0 = lrelu(self.g_bn0(h0, train=False))
 
 
-        h1 = self.upsample(h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        h1 = lrelu(self.g_bn1(h1, train=False))
+          h1 = self.upsample(h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
+          h1 = lrelu(self.g_bn1(h1, train=False))
 
-        h2 = self.upsample(h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
-        h2 = lrelu(self.g_bn2(h2, train=False))
+          h2 = self.upsample(h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+          h2 = lrelu(self.g_bn2(h2, train=False))
 
-        h3 = self.upsample(h2, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h3')
-        h3 = lrelu(self.g_bn3(h3, train=False))
+          h3 = self.upsample(h2, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+          h3 = lrelu(self.g_bn3(h3, train=False))
 
-        h4 = self.upsample(h3, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h4')
-        h4 = lrelu(self.g_bn4(h4, train=False))
+          h4 = self.upsample(h3, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h4')
+          h4 = lrelu(self.g_bn4(h4, train=False))
 
-        h5 = self.upsample(h4, [-1, s_h2, s_w2, self.gf_dim], name='g_h5')
-        h5 = lrelu(self.g_bn5(h5, train=False))
+          h5 = self.upsample(h4, [-1, s_h2, s_w2, self.gf_dim], name='g_h5')
+          h5 = lrelu(self.g_bn5(h5, train=False))
 
-        h6 = self.upsample(h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
+          h6 = self.upsample(h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
 
-        return tf.nn.tanh(h6)
-      else:
-        s_h, s_w = self.output_height, self.output_width #256/256
-        s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
-        s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
-        s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
-        #s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
-        #s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
-        #s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
+          return tf.nn.tanh(h6)
+        else:
+          s_h, s_w = self.output_height, self.output_width #256/256
+          s_h2, s_w2 = conv_out_size_same(s_h, 2), conv_out_size_same(s_w, 2)      #128/128
+          s_h4, s_w4 = conv_out_size_same(s_h2, 2), conv_out_size_same(s_w2, 2)    #64/64
+          s_h8, s_w8 = conv_out_size_same(s_h4, 2), conv_out_size_same(s_w4, 2)    #32/32
+          #s_h16, s_w16 = conv_out_size_same(s_h8, 2), conv_out_size_same(s_w8, 2)  #16/16
+          #s_h32, s_w32 = conv_out_size_same(s_h16, 2), conv_out_size_same(s_w16, 2)#8/8
+          #s_h64, s_w64 = conv_out_size_same(s_h32, 2), conv_out_size_same(s_w32, 2)#4/4
 
-        yb = tf.reshape(y, [-1, 1, 1, self.y_dim])
-        z = concat([z,y],1)
-        #z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
-        z_ = linear(z, 4 * self.gf_dim * s_h8 * s_w8, 'g_h0_lin')
-        h2 = tf.reshape(z_, [-1, s_h8, s_w8, self.gf_dim * 4])
-        #h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
-        #h0 = lrelu(self.g_bn0(h0, train=False))
-        #h0 = conv_cond_concat(h0,yb)
+          yb = tf.reshape(y, [-1, 1, 1, self.y_dim])
+          z = concat([z,y],1)
+          #z_ = linear(z, self.gf_dim*16*s_h64*s_w64, 'g_h0_lin')
+          z_ = linear(z, 4 * self.gf_dim * s_h8 * s_w8, 'g_h0_lin')
+          h2 = tf.reshape(z_, [-1, s_h8, s_w8, self.gf_dim * 4])
+          #h0 = tf.reshape(z_, [-1, s_h64, s_w64, self.gf_dim * 16])
+          #h0 = lrelu(self.g_bn0(h0, train=False))
+          #h0 = conv_cond_concat(h0,yb)
 
-        #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
+          #Unlike the original paper, we use resize convolutions to avoid checkerboard artifacts.
 
-        #h1 = self.upsample(h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
-        #h1 = lrelu(self.g_bn1(h1, train=False))
-        #h1 = conv_cond_concat(h1,yb)
+          #h1 = self.upsample(h0, [-1, s_h32, s_w32, self.gf_dim*16], name='g_h1')
+          #h1 = lrelu(self.g_bn1(h1, train=False))
+          #h1 = conv_cond_concat(h1,yb)
 
-        #h2 = self.upsample(h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
-        #h2 = lrelu(self.g_bn2(h2, train=False))
-        #h2 = conv_cond_concat(h2,yb)
+          #h2 = self.upsample(h1, [-1, s_h16, s_w16, self.gf_dim*8], name='g_h2')
+          #h2 = lrelu(self.g_bn2(h2, train=False))
+          #h2 = conv_cond_concat(h2,yb)
 
-        h3 = self.upsample(h2, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h3')
-        h3 = lrelu(self.g_bn3(h3, train=False))
-        h3 = conv_cond_concat(h3,yb)
+          h3 = self.upsample(h2, [-1, s_h8, s_w8, self.gf_dim*4], name='g_h3')
+          h3 = lrelu(self.g_bn3(h3, train=False))
+          h3 = conv_cond_concat(h3,yb)
 
-        h4 = self.upsample(h3, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h4')
-        h4 = lrelu(self.g_bn4(h4, train=False))
-        h4 = conv_cond_concat(h4,yb)
+          h4 = self.upsample(h3, [-1, s_h4, s_w4, self.gf_dim*2], name='g_h4')
+          h4 = lrelu(self.g_bn4(h4, train=False))
+          h4 = conv_cond_concat(h4,yb)
 
-        h5 = self.upsample(h4, [-1, s_h2, s_w2, self.gf_dim], name='g_h5')
-        h5 = lrelu(self.g_bn5(h5, train=False))
-        h5 = conv_cond_concat(h5,yb)
+          h5 = self.upsample(h4, [-1, s_h2, s_w2, self.gf_dim], name='g_h5')
+          h5 = lrelu(self.g_bn5(h5, train=False))
+          h5 = conv_cond_concat(h5,yb)
 
-        h6 = self.upsample(h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
+          h6 = self.upsample(h5, [-1, s_h, s_w, self.c_dim], name='g_h6')
 
-        return tf.nn.tanh(h6)
+          return tf.nn.tanh(h6)
 
   def get_y(self, sample_inputs):
     ret = []
@@ -850,7 +859,7 @@ class DCGAN(object):
       print(" [*] Failed to find a checkpoint")
       return False, 0
 
-  def load(self, checkpoint_dir, config, style_net_checkpoint_dir=None):
+  def load(self, checkpoint_dir, config, style_net_checkpoint_dir=None, use_last_checkpoint=True):
     import re
     print(" [*] Reading checkpoints...")
     if not config.use_default_checkpoint:
@@ -862,15 +871,32 @@ class DCGAN(object):
         raise ValueError('style_net_checkpoint_dir points to wrong directory/model doesn\'t exist')
       ckpt_name = os.path.join(style_net_checkpoint_dir, os.path.basename(ckpt.model_checkpoint_path))
       self.style_net_saver.restore(self.sess, tf.train.latest_checkpoint(style_net_checkpoint_dir))
+
+    # finds teh checkpoint
+    if config.use_default_checkpoint and use_last_checkpoint:
+      def get_parent_path(path):
+        return os.path.normpath(os.path.join(path, os.pardir))
+      path = get_parent_path(get_parent_path( checkpoint_dir))
+      #find the high checkpoint path in a path
+      last_ = sorted(os.listdir(path))[-2]
+      checkpoint_dir  = os.path.join(path, last_, 'checkpoint')
+
+
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
     if ckpt and ckpt.model_checkpoint_path:
       ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
       self.saver.restore(self.sess, os.path.join(checkpoint_dir, ckpt_name))
       counter = int(next(re.finditer("(\d+)(?!.*\d)",ckpt_name)).group(0))
       print(" [*] Success to read {}".format(ckpt_name))
-      return True, counter
+      if os.path.exists(os.path.join(checkpoint_dir, 'sample_z.npy')):
+        print(" [*] Success to read sample_z in {}".format(ckpt_name))
+        sample_z = np.load('sample_z.npy')
+      else:
+        print(" [*] Failed to find a sample_z")
+        sample_z = None
+      return True, counter, sample_z
     else:
       print(" [*] Failed to find a checkpoint")
-      return False, 0
+      return False, 0, None
 
 
