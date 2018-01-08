@@ -1,4 +1,5 @@
 # export CUDA_VISIBLE_DEVICES=0 # edit this if you want to limit yourself to GPU
+export PYTHONPATH="slim/:$PYTHONPATH"
 python3 main.py \
 --epoch 25 \
 --learning_rate .0001 \
@@ -12,9 +13,8 @@ python3 main.py \
 --use_resize True \
 --dataset wikiart \
 --input_fname_pattern */*.jpg \
---checkpoint_dir checkpoint \
---sample_dir samples \
+--load_dir "logs/can_paper"
 --crop False \
 --visualize False \
 --can True \
---train \
+--train False

@@ -28,6 +28,7 @@ flags.DEFINE_string("input_fname_pattern", "*.jpg", "Glob pattern of filename of
 flags.DEFINE_string("log_dir", 'logs', "Directory to store logs [logs]")
 flags.DEFINE_string("checkpoint_dir", None, "Directory name to save the checkpoints [<FLAGS.log_dir>/checkpoint]")
 flags.DEFINE_string("sample_dir", None, "Directory name to save the image samples [<FLAGS.log_dir>/samples]")
+flags.DEFINE_string("load_dir", None, "Directory that specifies checkpoint to load")
 flags.DEFINE_boolean("train", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("crop", False, "True for training, False for testing [False]")
 flags.DEFINE_boolean("visualize", False, "True for visualizing, False for nothing [False]")
