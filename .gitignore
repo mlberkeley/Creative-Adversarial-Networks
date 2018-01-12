@@ -23,6 +23,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Jupyter notebooks
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
 # C extensions
 *.so
 
@@ -88,3 +92,5 @@ Session.vim
 *~
 
 
+# philkuz random folders
+_*/

@@ -26,6 +26,18 @@ else:
   def concat(tensors, axis, *args, **kwargs):
     return tf.concat(tensors, axis, *args, **kwargs)
 
+def conv_out_size_same(size, stride):
+  return int(math.ceil(float(size) / float(stride)))
+
+def sigmoid_cross_entropy_with_logits(x, y):
+      try:
+        return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, labels=y)
+      except:
+        return tf.nn.sigmoid_cross_entropy_with_logits(logits=x, targets=y)
+
+def layer_norm(inputs, name):
+   return tf.contrib.layers.layer_norm(inputs, scope=name)
+
 class batch_norm(object):
   def __init__(self, epsilon=1e-5, momentum = 0.9, name="batch_norm"):
     with tf.variable_scope(name):
@@ -44,8 +56,8 @@ class batch_norm(object):
 
 def conv_cond_concat(x, y):
   """Concatenate conditioning vector on feature map axis."""
-  x_shapes = x.get_shape()
-  y_shapes = y.get_shape()
+  x_shapes = tf.shape(x)
+  y_shapes = tf.shape(y)
   return concat([
     x, y*tf.ones([x_shapes[0], x_shapes[1], x_shapes[2], y_shapes[3]])], 3)
 
@@ -79,6 +91,7 @@ def resizeconv(input_, output_shape,
     biases = tf.get_variable('biases', output_shape[-1], initializer=tf.constant_initializer(0.0))
     
     return tf.nn.bias_add(resconv, biases)
+
 def deconv2d(input_, output_shape,
        k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
        name="deconv2d"):
