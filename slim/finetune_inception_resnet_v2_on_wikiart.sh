@@ -49,74 +49,74 @@ if [ ! -f ${PRETRAINED_CHECKPOINT_DIR}/${MODEL_NAME}.ckpt ]; then
 fi
 
 # # Download the dataset
-# python download_and_convert_data.py \
-#   --dataset_name=wikiart \
-#   --dataset_dir=${DATASET_DIR}
-#   --input_dataset_dir=${INPUT_DATASET_DIR}
+python download_and_convert_data.py \
+  --dataset_name=wikiart \
+  --dataset_dir=${DATASET_DIR}
+  --input_dataset_dir=${INPUT_DATASET_DIR}
 
 # @philkuz I use this to create a nice initialization - haven't tried random
 # TODO try out if your'e curious to see whether random initialization of last
 # layer makes sense in this case.
-# Fine-tune only the new layers for 1000 steps.
-# python3 train_image_classifier.py \
-#   --train_dir=${TRAIN_DIR} \
-#   --dataset_name=wikiart \
-#   --dataset_split_name=train \
-#   --dataset_dir=${DATASET_DIR} \
-#   --model_name=${MODEL_NAME} \
-#   --checkpoint_path=${PRETRAINED_CHECKPOINT_DIR}/${MODEL_NAME}.ckpt \
-#   --checkpoint_exclude_scopes=InceptionResnetV2/Logits,InceptionResnetV2/AuxLogits \
-#   --trainable_scopes=InceptionResnetV2/Logits,InceptionResnetV2/AuxLogits \
-#   --max_number_of_steps=10000 \
-#   --batch_size=32 \
-#   --learning_rate=0.01 \
-#   --learning_rate_decay_type=fixed \
-#   --save_interval_secs=300 \
-#   --save_summaries_secs=60 \
-#   --log_every_n_steps=200 \
-#   --optimizer=rmsprop \
-#   --train_image_size=256 \
-#   --weight_decay=0.00004
+# Fine-tune only the last layer for 1000 steps.
+python3 train_image_classifier.py \
+  --train_dir=${TRAIN_DIR} \
+  --dataset_name=wikiart \
+  --dataset_split_name=train \
+  --dataset_dir=${DATASET_DIR} \
+  --model_name=${MODEL_NAME} \
+  --checkpoint_path=${PRETRAINED_CHECKPOINT_DIR}/${MODEL_NAME}.ckpt \
+  --checkpoint_exclude_scopes=InceptionResnetV2/Logits,InceptionResnetV2/AuxLogits \
+  --trainable_scopes=InceptionResnetV2/Logits,InceptionResnetV2/AuxLogits \
+  --max_number_of_steps=10000 \
+  --batch_size=32 \
+  --learning_rate=0.01 \
+  --learning_rate_decay_type=fixed \
+  --save_interval_secs=300 \
+  --save_summaries_secs=60 \
+  --log_every_n_steps=200 \
+  --optimizer=rmsprop \
+  --train_image_size=256 \
+  --weight_decay=0.00004
 
 # Run evaluation.
-# python3 eval_image_classifier.py \
-#   --checkpoint_path=${TRAIN_DIR} \
-#   --eval_dir=${TRAIN_DIR} \
-#   --dataset_name=wikiart \
-#   --dataset_split_name=validation \
-#   --dataset_dir=${DATASET_DIR} \
-#   --model_name=${MODEL_NAME} \
-#   --eval_image_size=256
+python3 eval_image_classifier.py \
+  --checkpoint_path=${TRAIN_DIR} \
+  --eval_dir=${TRAIN_DIR} \
+  --dataset_name=wikiart \
+  --dataset_split_name=validation \
+  --dataset_dir=${DATASET_DIR} \
+  --model_name=${MODEL_NAME} \
+  --eval_image_size=256
 
 # Fine-tune all the new layers for 500 steps.
 NUM_EPOCHS=100
 BATCH_SIZE=16
-EXPERIMENT_NAME=smol_adam_fixedLR
+EXPERIMENT_NAME=inception_resnet_v2
 LR=0.0001 \
 
 TRAIN_DIR=logs/wikiart/inception_resnet_v2/experiments/${EXPERIMENT_NAME}/bs=${BATCH_SIZE},lr=${LR},epochs=${NUM_EPOCHS}/
 
-# python3 train_image_classifier.py \
-#   --train_dir=${TRAIN_DIR}/all \
-#   --dataset_name=wikiart \
-#   --dataset_split_name=train \
-#   --dataset_dir=${DATASET_DIR} \
-#   --model_name=${MODEL_NAME} \
-#   --checkpoint_path=${TRAIN_DIR} \
-#   --batch_size=${BATCH_SIZE} \
-#   --learning_rate=${LR} \
-#   --learning_rate_decay_type=fixed \
-#   --save_interval_secs=300 \
-#   --save_summaries_secs=60 \
-#   --num_epochs_per_decay=1 \
-#   --log_every_n_steps=200 \
-#   --optimizer=adam \
-#   --weight_decay=0.00004 \
-#   --experiment_name=${EXPERIMENT_NAME} \
-#   --num_epochs=${NUM_EPOCHS} \
-#   --train_image_size=256 \
-#   --continue_training False \
-#   --experiment_numbering # TODO flag to flip on experiment numbering independent of experiement name arg existing
+python3 train_image_classifier.py \
+  --train_dir=${TRAIN_DIR}/all \
+  --dataset_name=wikiart \
+  --dataset_split_name=train \
+  --dataset_dir=${DATASET_DIR} \
+  --model_name=${MODEL_NAME} \
+  --checkpoint_path=${TRAIN_DIR} \
+  --batch_size=${BATCH_SIZE} \
+  --learning_rate=${LR} \
+  --learning_rate_decay_type=fixed \
+  --save_interval_secs=300 \
+  --save_summaries_secs=60 \
+  --num_epochs_per_decay=1 \
+  --log_every_n_steps=200 \
+  --optimizer=adam \
+  --weight_decay=0.00004 \
+  --experiment_name=${EXPERIMENT_NAME} \
+  --num_epochs=${NUM_EPOCHS} \
+  --train_image_size=256 \
+  --continue_training False \
+  # --experiment_numbering # TODO flag to flip on experiment numbering independent of experiement name arg existing
 # # TODO catch the naming convention
 
 # Run evaluation.

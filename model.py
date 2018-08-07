@@ -559,8 +559,10 @@ class DCGAN(object):
 
         checkpoint_dir  = os.path.join(path, last_, 'checkpoint')
       else:
-        checkpoint = None
+        checkpoint_dir = None
 
+    if config.load_dir:
+      checkpoint_dir = config.load_dir
 
     ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
     if ckpt and ckpt.model_checkpoint_path:
@@ -575,6 +577,8 @@ class DCGAN(object):
         print(" [*] Failed to find a sample_z")
         sample_z = None
       return True, counter, sample_z
+    elif config.load_dir:
+      raise ValueError(" [*] Failed to find the load_dir")
     else:
       print(" [*] Failed to find a checkpoint")
       return False, 0, None
