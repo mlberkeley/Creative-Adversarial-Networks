@@ -15,13 +15,13 @@ Repo based on [DCGAN-tensorflow](https://github.com/carpedm20/DCGAN-tensorflow).
 
 ## Getting the Dataset
 We used the [wikiart](https://www.wikiart.org/) dataset 
-[available here](https://github.com/cs-chan/ICIP2016-PC/tree/f5d6f6b58a6d8a4bd05aaaedd9688d08c02df8f2/WikiArt%20Dataset). 
+[available here](https://github.com/cs-chan/ArtGAN/tree/master/WikiArt%20Dataset). 
 Using the dataset is subject to wikiart's [terms of use](https://www.wikiart.org/en/terms-of-use)
 
 ```
 mkdir data
 cd data
-wget http://www.cs-chan.com/source/ICIP2017/wikiart.zip
+wget http://web.fsktm.um.edu.my/~cschan/source/ICIP2017/wikiart.zip
 unzip wikiart.zip
 ```
 
